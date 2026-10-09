@@ -105,29 +105,85 @@ export function RichEditor({
         maxWidth = 1024;  quality = 0.8;
       }
 
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
+      // Decode via a blob object URL — no giant base64 string in memory.
+      // (readAsDataURL on a multi-MB photo can fail on the first try in
+      // Android WebView; object URLs stream directly into the decoder.)
+      const encode = (img, width, height) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        return canvas.toDataURL('image/jpeg', quality);
+      };
+
+      const finishWithImg = (img, revoke) => {
+        try {
           let { width, height } = img;
+          if (!width || !height) throw new Error('Failed to load image');
           if (width > maxWidth) {
             height = Math.round(height * (maxWidth / width));
             width = maxWidth;
           }
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.fillStyle = '#fff';
-          ctx.fillRect(0, 0, width, height);
-          ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', quality));
-        };
-        img.onerror = () => reject(new Error('Failed to load image'));
-        img.src = e.target.result;
+          resolve(encode(img, width, height));
+        } catch (err) {
+          reject(err);
+        } finally {
+          if (revoke) URL.revokeObjectURL(revoke);
+        }
       };
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsDataURL(file);
+
+      const tryWithObjectUrl = () => {
+        const objUrl = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => finishWithImg(img, objUrl);
+        img.onerror = () => {
+          URL.revokeObjectURL(objUrl);
+          // Fallback: old FileReader path (some WebViews only decode this way)
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const img2 = new Image();
+            img2.onload = () => finishWithImg(img2, null);
+            img2.onerror = () => reject(new Error('图片格式不支持 / Unsupported image format (try a JPG/PNG)'));
+            img2.src = e.target.result;
+          };
+          reader.onerror = () => reject(new Error('Failed to read file'));
+          reader.readAsDataURL(file);
+        };
+        img.src = objUrl;
+      };
+
+      // Prefer createImageBitmap where available (handles EXIF orientation);
+      // otherwise fall back to the object-URL <img> path.
+      if (typeof createImageBitmap === 'function') {
+        createImageBitmap(file)
+          .then((bmp) => {
+            try {
+              let { width, height } = bmp;
+              if (width > maxWidth) {
+                height = Math.round(height * (maxWidth / width));
+                width = maxWidth;
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              ctx.fillStyle = '#fff';
+              ctx.fillRect(0, 0, width, height);
+              ctx.drawImage(bmp, 0, 0, width, height);
+              bmp.close();
+              resolve(canvas.toDataURL('image/jpeg', quality));
+            } catch (err) {
+              try { bmp.close(); } catch {}
+              tryWithObjectUrl();
+            }
+          })
+          .catch(tryWithObjectUrl);
+      } else {
+        tryWithObjectUrl();
+      }
     });
   };
 

@@ -12,8 +12,8 @@ import authRoutes from './routes/auth.js';
 import documentRoutes from './routes/documents.js';
 import userRoutes from './routes/users.js';
 import countRoutes from './routes/count.js';
-import translateRoutes from './routes/translate.js';
 import { schedule as scheduleCountJob } from './services/countScheduler.js';
+import translateRoutes from './routes/translate.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -57,6 +57,20 @@ app.get('/api/download-apk', (req, res) => {
     const apkFile = files.find(f => f.endsWith('.apk'));
     if (!apkFile) return res.status(404).json({ error: 'APK not found' });
     res.download(path.join(apkDir, apkFile), apkFile);
+  });
+});
+
+// App version check for the Android auto-update flow.
+// version = APK build timestamp (yyyyMMddHHmmss, Beijing time)
+app.get('/api/app-version', (req, res) => {
+  fs.readdir(apkDir, (err, files) => {
+    if (err) return res.status(404).json({ error: 'APK not found' });
+    const apkFile = files.find(f => f.endsWith('.apk'));
+    if (!apkFile) return res.status(404).json({ error: 'APK not found' });
+    // APK filename convention: diary-app-<yyyyMMddHHmmss>.apk (fallback: mtime)
+    const m = apkFile.match(/(\d{14})/);
+    const version = m ? m[1] : fs.statSync(path.join(apkDir, apkFile)).mtime.toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
+    res.json({ version, apk: apkFile });
   });
 });
 

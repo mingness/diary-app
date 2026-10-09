@@ -1,53 +1,75 @@
 /**
- * Translate route — proxy to an OpenAI-compatible LLM API.
+ * Translation route — POST /api/translate
  *
- * Endpoints:
- *   POST /api/translate — body { text, direction: 'to-zh' | 'to-en' } → { translation }
+ * Body: { text: string, direction: 'to-zh' | 'to-en' }
+ * Uses an OpenAI-compatible chat API (configured in config/translate.js)
+ * to translate diary content / comments between English and Traditional Chinese.
  */
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import { translateConfig } from '../config/translate.js';
 
 const router = Router();
+
 router.use(authMiddleware);
 
 router.post('/', async (req, res) => {
-  const { text, direction } = req.body;
-  if (!text || typeof text !== 'string') {
-    return res.status(400).json({ error: 'text is required' });
+  const { text, direction } = req.body || {};
+  if (!text || typeof text !== 'string' || !text.trim()) {
+    return res.status(400).json({ error: 'Missing text', errorZh: '缺少翻译内容' });
   }
   if (direction !== 'to-zh' && direction !== 'to-en') {
-    return res.status(400).json({ error: 'direction must be "to-zh" or "to-en"' });
-  }
-  if (!translateConfig.apiKey) {
-    return res.status(503).json({ error: 'Translation is not configured' });
+    return res.status(400).json({ error: 'Invalid direction', errorZh: '无效的翻译方向' });
   }
 
-  const prompt = direction === 'to-zh'
-    ? `translate <context> from English to 繁體中文 at expert level. <context>${text}</context>`
-    : `translate <context> from 繁體中文 to English at expert level. <context>${text}</context>`;
+  const target = direction === 'to-zh'
+    ? '繁體中文（Traditional Chinese）'
+    : 'English';
 
-  const llmRes = await fetch(`${translateConfig.apiBaseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${translateConfig.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: translateConfig.model,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.3,
-    }),
-  });
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30_000);
 
-  if (!llmRes.ok) {
-    console.error('[translate] LLM API error:', llmRes.status, await llmRes.text());
-    return res.status(502).json({ error: `LLM API error (${llmRes.status})` });
+    const response = await fetch(`${translateConfig.apiBaseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${translateConfig.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: translateConfig.model,
+        messages: [
+          {
+            role: 'system',
+            content: `You are a translator. Translate the user's text into ${target}. Output ONLY the translation, no explanations, no quotes.`,
+          },
+          { role: 'user', content: text },
+        ],
+        temperature: 0.2,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      console.error(`[translate] upstream ${response.status}:`, detail.slice(0, 300));
+      return res.status(502).json({ error: `Translation service error (${response.status})`, errorZh: `翻译服务出错 (${response.status})` });
+    }
+
+    const data = await response.json();
+    const translation = data?.choices?.[0]?.message?.content?.trim();
+    if (!translation) {
+      return res.status(502).json({ error: 'Empty translation', errorZh: '翻译结果为空' });
+    }
+    res.json({ translation });
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      return res.status(504).json({ error: 'Translation timed out', errorZh: '翻译超时' });
+    }
+    console.error('[translate] failed:', err?.message || err);
+    res.status(500).json({ error: 'Translation failed', errorZh: '翻译失败' });
   }
-
-  const llmData = await llmRes.json();
-  const translation = llmData.choices?.[0]?.message?.content?.trim() || '';
-  res.json({ translation });
 });
 
 export default router;

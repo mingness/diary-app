@@ -5,21 +5,39 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f5f0eb; colo
 .card label { display: block; margin: .75rem 0; }
 .card input, .card select { width: 100%; padding: .5rem; margin-top: .25rem; border: 1px solid #ccc; border-radius: 6px; }
 .btn-primary { background: #8b5a2b; color: #fff; border: none; padding: .6rem 1.2rem; border-radius: 8px; cursor: pointer; }
+/* Default all bare buttons to the 'My Diary' (btn-primary) look */
+button {
+  background: #8b5a2b;
+  color: #fff;
+  border: none;
+  padding: .45rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: .95rem;
+}
+button:hover { background: #6d4520; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+/* Small inline buttons keep a smaller footprint but same brown theme */
+.btn-sm { background: #8b5a2b; color: #fff; border: none; padding: .25rem .6rem; font-size: .85rem; border-radius: 6px; }
+.btn-sm:hover { background: #6d4520; }
 .btn-primary:hover { background: #6d4520; }
 .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 .btn-back { background: #8b5a2b; color: #fff; border: none; padding: .6rem .3rem; border-radius: 8px; cursor: pointer; }
 .btn-back:hover { background: #6d4520; }
-.btn-sm { padding: .25rem .5rem; font-size: .85rem; border-radius: 4px; border: 1px solid #ccc; background: #fff; cursor: pointer; }
-.btn-secondary { padding: .4rem .8rem; font-size: .9rem; border-radius: 6px; border: 1px solid #8b5a2b; background: #fff; color: #8b5a2b; cursor: pointer; }
-.btn-secondary:hover { background: #f0ebe4; }
-.danger { color: #c0392b; border-color: #c0392b; }
+.btn-sm { padding: .25rem .5rem; font-size: .85rem; border-radius: 4px; border: none; background: #8b5a2b; color: #fff; cursor: pointer; }
+.btn-sm:hover { background: #6d4520; }
+.btn-secondary { padding: .4rem .8rem; font-size: .9rem; border-radius: 6px; border: none; background: #8b5a2b; color: #fff; cursor: pointer; }
+.btn-secondary:hover { background: #6d4520; }
+.danger { background: #c0392b; color: #fff; }
+.danger:hover { background: #96281b; }
 .top-bar, .home-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
 .home-header-right { display: flex; align-items: center; gap: .5rem; }
 .home-header-right .lang-switch button { margin-left: 0; }
-.lang-switch button { margin-left: .5rem; padding: .3rem .8rem; border: 1px solid #8b5a2b; background: #fff; cursor: pointer; border-radius: 6px; min-width: 5rem; }
-.lang-switch button.active { background: #8b5a2b; color: #fff; }
-.lang-toggle { padding: .3rem .8rem; border: 1px solid #8b5a2b; background: #fff; color: #8b5a2b; cursor: pointer; border-radius: 6px; min-width: 5rem; font-size: .9rem; }
-.lang-toggle:hover { background: #f0ebe4; }
+.lang-switch button { margin-left: .5rem; padding: .3rem .8rem; border: none; background: #8b5a2b; color: #fff; cursor: pointer; border-radius: 6px; min-width: 5rem; }
+.lang-switch button:hover { background: #6d4520; }
+.lang-switch button.active { background: #6d4520; color: #fff; }
+.lang-toggle { padding: .3rem .8rem; border: none; background: #8b5a2b; color: #fff; cursor: pointer; border-radius: 6px; min-width: 5rem; font-size: .9rem; }
+.lang-toggle:hover { background: #6d4520; }
 .count-logo { height: 48px; width: auto; }
 .count-header-col { display: flex; flex-direction: column; align-items: center; gap: .5rem; }
 .count-title { white-space: pre-line; text-align: center; margin: 0; }
@@ -106,10 +124,10 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f5f0eb; colo
 .count-table tbody tr:nth-child(odd) { background: #ffffff; }
 .count-table tbody tr:nth-child(even) { background: #e6f3ff; }
 .count-table tr.auto-row { color: #2563eb; }
-.count-toggle-on { background: #2e7d32; color: #fff; border: none; padding: .25rem .6rem; border-radius: 4px; cursor: pointer; font-size: .8rem; }
-.count-toggle-on:hover { background: #1b5e20; }
-.count-toggle-off { background: #fff; color: #888; border: 1px solid #ccc; padding: .25rem .6rem; border-radius: 4px; cursor: pointer; font-size: .8rem; }
-.count-toggle-off:hover { background: #f0ebe4; }
+.count-toggle-on { background: #8b5a2b; color: #fff; border: none; padding: .25rem .6rem; border-radius: 4px; cursor: pointer; font-size: .8rem; }
+.count-toggle-on:hover { background: #6d4520; }
+.count-toggle-off { background: #8b5a2b; color: #fff; border: none; padding: .25rem .6rem; border-radius: 4px; cursor: pointer; font-size: .8rem; }
+.count-toggle-off:hover { background: #6d4520; }
 .count-empty { color: #888; text-align: center; padding: 1.5rem; }
 .count-success { color: #2e7d32; margin: .5rem 0; font-weight: 600; }
 .count-header-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }

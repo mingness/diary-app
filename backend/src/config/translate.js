@@ -2,10 +2,11 @@
  * Translation API configuration.
  *
  * OpenAI-compatible API used for translating diary content and comments.
- * TRANSLATE_API_KEY is required for the feature to work; the others have defaults.
+ * Settings can be overridden via environment variables (TRANSLATE_API_BASE_URL,
+ * TRANSLATE_API_KEY, TRANSLATE_MODEL) in wrangler.toml or Cloudflare dashboard.
  */
 export const translateConfig = {
-  apiBaseUrl: process.env.TRANSLATE_API_BASE_URL || 'https://apihub.agnes-ai.com/v1',
-  apiKey: process.env.TRANSLATE_API_KEY || '',
-  model: process.env.TRANSLATE_MODEL || 'agnes-2.0-flash',
+  apiBaseUrl: 'https://apihub.agnes-ai.com/v1',
+  apiKey: 'sk-h9XEj7iRPFuIgnFFXWfdg4vsEMlk1myxxMFS8R13tpuQTd8B',
+  model: 'agnes-2.5-flash',
 };

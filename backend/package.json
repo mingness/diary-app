@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "seed": "node src/seed.js"
+    "seed": "node src/seed.js",
+    "deploy:cf": "wrangler deploy",
+    "dev:cf": "wrangler dev"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -14,10 +16,14 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-async-errors": "^3.1.1",
+    "hono": "^4.12.31",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.16",
     "pg": "^8.13.1",
     "uuid": "^11.0.3"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0"
   }
 }

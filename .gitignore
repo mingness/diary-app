@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Runtime data
+backend/uploads/
+backend/downloads/
+backend/data/
+*.log
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.timestamp-*.mjs
+
+# Python caches (legacy scripts)
+__pycache__/

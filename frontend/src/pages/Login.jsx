@@ -32,11 +32,21 @@ export function Login() {
   };
 
   // Auto-login with saved credentials (Android app)
+  // Uses the synchronous AndroidBridge.getCredentials() when available —
+  // injected __SAVED_CREDENTIALS__ can race with React's first render.
   useEffect(() => {
     if (autoLoginAttempted.current) return;
     autoLoginAttempted.current = true;
 
-    const savedCreds = window.__SAVED_CREDENTIALS__;
+    let savedCreds = null;
+    try {
+      if (window.AndroidBridge && window.AndroidBridge.getCredentials) {
+        savedCreds = JSON.parse(window.AndroidBridge.getCredentials());
+      }
+    } catch {}
+    if (!savedCreds || !savedCreds.userName || !savedCreds.password) {
+      savedCreds = window.__SAVED_CREDENTIALS__;
+    }
     if (savedCreds && savedCreds.userName && savedCreds.password) {
       setAutoLoggingIn(true);
       autoLogin(savedCreds.userName, savedCreds.password)

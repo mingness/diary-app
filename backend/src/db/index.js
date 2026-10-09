@@ -1,19 +1,63 @@
 import pg from 'pg';
 
-const pool = new pg.Pool({
-  host: process.env.PGHOST || 'localhost',
-  port: parseInt(process.env.PGPORT || '5432', 10),
-  database: process.env.PGDATABASE || 'riji',
-  user: process.env.PGUSER || 'postgres',
-  password: process.env.PGPASSWORD || 'postgres',
-  ssl: process.env.PGSSL === 'require' ? { rejectUnauthorized: false } : undefined,
-  max: 5,
-});
+// Connection config — set by initFromEnv() or initFromHyperdrive()
+let connectionConfig = null;
+let usePool = false;  // Pool for local dev, per-query client for Workers
+let pool = null;
 
-/** Get a pooled client */
+/** Initialize from environment variables (local development / Render) */
+export function initFromEnv() {
+  if (connectionConfig) return;
+  connectionConfig = {
+    host: process.env.PGHOST || 'localhost',
+    port: parseInt(process.env.PGPORT || '5432', 10),
+    database: process.env.PGDATABASE || 'riji',
+    user: process.env.PGUSER || 'postgres',
+    password: process.env.PGPASSWORD || 'postgres',
+  };
+  if (process.env.PGSSL === 'require') {
+    connectionConfig.ssl = { require: true, rejectUnauthorized: false };
+  }
+  // Use Pool for local dev / Render (persistent Node.js process)
+  usePool = true;
+  pool = new pg.Pool({ ...connectionConfig, max: 5 });
+}
+
+/** Initialize from Hyperdrive binding (Cloudflare Workers) */
+export function initFromHyperdrive(hyperdrive) {
+  if (connectionConfig) return;
+  // Hyperdrive provides a connectionString that handles SSL and routing
+  if (hyperdrive.connectionString) {
+    connectionConfig = { connectionString: hyperdrive.connectionString };
+  } else {
+    connectionConfig = {
+      host: hyperdrive.host,
+      port: hyperdrive.port,
+      database: hyperdrive.database,
+      user: hyperdrive.user,
+      password: hyperdrive.password,
+    };
+  }
+  // In Workers, use per-query clients — Pool doesn't work reliably
+  // because Workers don't maintain persistent TCP connections between requests
+  usePool = false;
+}
+
+// Auto-initialize from env if not in Worker context (for local dev / Render)
+if (!connectionConfig && typeof process !== 'undefined' && process.env && process.env.PGHOST) {
+  initFromEnv();
+}
+
+/** Get a connected client (from Pool or create new) */
 async function getClient() {
-  const client = await pool.connect();
-  return { client, release: () => client.release() };
+  if (usePool) {
+    const client = await pool.connect();
+    return { client, release: () => client.release() };
+  }
+  // Per-query client for Workers
+  const client = new pg.Client(connectionConfig);
+  await client.connect();
+  return { client, release: () => client.end().catch(() => {}) };
 }
 
 /** Execute a query with automatic client management and retry */

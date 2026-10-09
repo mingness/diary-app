@@ -24,7 +24,7 @@ router.use(authMiddleware, sessionKeyMiddleware);
 
 router.get('/me', async (req, res) => {
   const password = req.sessionPassword;
-  let user = formatUser(req.user, password);
+  let user = await formatUser(req.user, password);
   const override = await getAdminProfileOverride(req.user.user_name);
   if (override) {
     user = {
@@ -51,7 +51,7 @@ router.put('/me', async (req, res) => {
     if (!ok) return res.status(400).json({ error: 'Wrong password', errorZh: '当前密码错误' });
   }
   const updated = await getUserByName(req.user.user_name);
-  res.json({ user: formatUser(updated, newPassword || password) });
+  res.json({ user: await formatUser(updated, newPassword || password) });
 });
 
 router.get('/all', requireRole('SYS_ADMIN', 'SUPER_ADMIN'), async (req, res) => {

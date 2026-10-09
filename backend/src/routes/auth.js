@@ -26,7 +26,7 @@ router.post('/login', async (req, res) => {
   if (!user || user.password_hash === 'RESET_PENDING' || !user.password_hash || !verifyPassword(user, password)) {
     return res.status(401).json({ error: 'Invalid credentials', errorZh: '用户名或密码错误' });
   }
-  const formattedUser = formatUser(user, password);
+  const formattedUser = await formatUser(user, password);
   // For existing users: if admin override is empty, sync decrypted profile so SYS_ADMIN can view it
   if (user.role === 'NORMAL_USER') {
     const override = await getAdminProfileOverride(userName);
@@ -49,7 +49,7 @@ router.post('/auto-login', async (req, res) => {
   if (!user || user.password_hash === 'RESET_PENDING' || !user.password_hash || !verifyPassword(user, password)) {
     return res.status(401).json({ error: 'Invalid credentials', errorZh: '用户名或密码错误' });
   }
-  const formattedUser = formatUser(user, password);
+  const formattedUser = await formatUser(user, password);
   // For existing users: if admin override is empty, sync decrypted profile so SYS_ADMIN can view it
   if (user.role === 'NORMAL_USER') {
     const override = await getAdminProfileOverride(userName);

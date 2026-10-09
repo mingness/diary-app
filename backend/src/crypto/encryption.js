@@ -1,6 +1,6 @@
 /**
  * AES-256-GCM encryption utilities with PBKDF2 key derivation.
- * Uses Web Crypto API for AES-GCM.
+ * Uses Web Crypto API for AES-GCM (compatible with Cloudflare Workers).
  * Key material never leaves the backend — K_user derived per session from password.
  */
 import nodeCrypto from 'crypto';
@@ -12,7 +12,7 @@ const DEK_LENGTH = 32;
 const PBKDF2_ITERATIONS = 100000;
 const PBKDF2_DIGEST = 'sha256';
 
-/** Get Web Crypto subtle interface */
+/** Get Web Crypto subtle interface (works in both Cloudflare Workers and Node.js 18+) */
 function getSubtle() {
   if (typeof globalThis.crypto !== 'undefined' && globalThis.crypto.subtle) {
     return globalThis.crypto.subtle;
@@ -20,7 +20,7 @@ function getSubtle() {
   return nodeCrypto.webcrypto.subtle;
 }
 
-/** Derive 32-byte user master key from password + salt via PBKDF2 (sync) */
+/** Derive 32-byte user master key from password + salt via PBKDF2 (sync, works in Workers) */
 export function deriveUserMasterKey(password, salt) {
   return nodeCrypto.pbkdf2Sync(password, salt, PBKDF2_ITERATIONS, 32, PBKDF2_DIGEST);
 }

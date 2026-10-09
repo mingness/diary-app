@@ -13,7 +13,18 @@
     "vercel-build": "npm install --prefix frontend && cd frontend && npm run build"
   },
   "dependencies": {
-    "serverless-http": "^3.2.0"
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-async-errors": "^3.1.1",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.9.16",
+    "pg": "^8.13.1",
+    "serverless-http": "^3.2.0",
+    "uuid": "^11.0.3"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

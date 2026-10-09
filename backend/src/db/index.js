@@ -5,7 +5,7 @@ let connectionConfig = null;
 let usePool = false;  // Pool for local dev, per-query client for Workers
 let pool = null;
 
-/** Initialize from environment variables (local development / Render) */
+/** Initialize from environment variables (local development / Render / Vercel+Neon) */
 export function initFromEnv() {
   if (connectionConfig) return;
   connectionConfig = {
@@ -15,7 +15,8 @@ export function initFromEnv() {
     user: process.env.PGUSER || 'postgres',
     password: process.env.PGPASSWORD || 'postgres',
   };
-  if (process.env.PGSSL === 'require') {
+  // Neon (and most managed PG) enforce TLS — always enable SSL in serverless
+  if (process.env.PGSSL === 'require' || process.env.VERCEL) {
     connectionConfig.ssl = { require: true, rejectUnauthorized: false };
   }
   // Use Pool for local dev / Render (persistent Node.js process)

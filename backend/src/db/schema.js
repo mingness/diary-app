@@ -108,5 +108,14 @@ export async function initSchema(db) {
       updated_at TEXT DEFAULT ${DATETIME_DEFAULT},
       FOREIGN KEY (user_name) REFERENCES users(user_name)
     );
+
+    CREATE TABLE IF NOT EXISTS uploads (
+      id SERIAL PRIMARY KEY,
+      filename TEXT UNIQUE NOT NULL,
+      mimetype TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      data BYTEA NOT NULL,
+      uploaded_at TEXT DEFAULT ${DATETIME_DEFAULT}
+    );
   `);
 }

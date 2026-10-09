@@ -297,8 +297,12 @@ export async function runAutoSubmitJob() {
 
 /** Internal endpoint to trigger the auto-submit job (for manual testing / cron). */
 router.post('/auto-run', async (req, res) => {
-  // Only allow SUPER_ADMIN to trigger manually
-  if (req.userRole !== 'SUPER_ADMIN') {
+  // Vercel Cron sends: Authorization: Bearer <CRON_SECRET>
+  const cronSecret = process.env.CRON_SECRET;
+  const authHeader = req.headers.authorization || '';
+  const isVercelCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
+  // Only allow SUPER_ADMIN to trigger manually (or a valid cron secret)
+  if (!isVercelCron && req.userRole !== 'SUPER_ADMIN') {
     return res.status(403).json({ error: 'Forbidden' });
   }
   const result = await runAutoSubmitJob();

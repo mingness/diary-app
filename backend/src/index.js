@@ -28,18 +28,56 @@ app.use(cookieParser());
 
 // Uploaded images for rich editor
 const uploadsDir = path.join(__dirname, '../uploads');
-fs.mkdirSync(uploadsDir, { recursive: true });
-app.use('/uploads', express.static(uploadsDir));
+const IS_VERCEL = !!process.env.VERCEL;
+if (!IS_VERCEL) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  app.use('/uploads', express.static(uploadsDir));
+}
 
 import multer from 'multer';
-const upload = multer({ dest: uploadsDir });
-app.post('/api/upload', (req, res, next) => {
-  upload.single('image')(req, res, (err) => {
-    if (err) return res.status(400).json({ error: 'Upload failed' });
-    if (!req.file) return res.status(400).json({ error: 'No file' });
-    res.json({ url: `/uploads/${req.file.filename}` });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+if (IS_VERCEL) {
+  // Serverless: filesystem is ephemeral — store uploads in Postgres and
+  // serve them back from the DB (images are pre-compressed client-side).
+  app.post('/api/upload', (req, res) => {
+    upload.single('image')(req, res, async (err) => {
+      if (err) return res.status(400).json({ error: 'Upload failed' });
+      if (!req.file) return res.status(400).json({ error: 'No file' });
+      try {
+        const filename = `${Date.now()}-${req.file.originalname.replace(/[^\w.-]/g, '_')}`;
+        await db.query('INSERT INTO uploads (filename, mimetype, size, data) VALUES ($1, $2, $3, $4)',
+          [filename, req.file.mimetype, req.file.size, req.file.buffer]);
+        res.json({ url: `/uploads/${filename}` });
+      } catch (e) {
+        console.error('[upload] db insert failed:', e?.message || e);
+        res.status(500).json({ error: 'Upload failed' });
+      }
+    });
   });
-});
+
+  app.get('/uploads/:filename', async (req, res) => {
+    try {
+      const row = await db.query('SELECT mimetype, data FROM uploads WHERE filename = $1', [req.params.filename]);
+      const file = row[0];
+      if (!file) return res.status(404).json({ error: 'Not found' });
+      res.setHeader('Content-Type', file.mimetype);
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.end(file.data);
+    } catch (e) {
+      res.status(500).json({ error: 'Read failed' });
+    }
+  });
+} else {
+  // Local / VM / container: keep the original disk-based flow
+  app.post('/api/upload', (req, res) => {
+    upload.single('image')(req, res, (err) => {
+      if (err) return res.status(400).json({ error: 'Upload failed' });
+      if (!req.file) return res.status(400).json({ error: 'No file' });
+      res.json({ url: `/uploads/${req.file.filename}` });
+    });
+  });
+}
 
 app.use('/api/auth', authRoutes);
 app.use('/api/documents', documentRoutes);
@@ -63,6 +101,10 @@ app.get('/api/download-apk', (req, res) => {
 // App version check for the Android auto-update flow.
 // version = APK build timestamp (yyyyMMddHHmmss, Beijing time)
 app.get('/api/app-version', (req, res) => {
+  // Vercel: version is provided as an env var (no persistent filesystem).
+  if (process.env.APP_VERSION) {
+    return res.json({ version: process.env.APP_VERSION, apk: 'diary-app.apk' });
+  }
   fs.readdir(apkDir, (err, files) => {
     if (err) return res.status(404).json({ error: 'APK not found' });
     const apkFile = files.find(f => f.endsWith('.apk'));
@@ -74,27 +116,38 @@ app.get('/api/app-version', (req, res) => {
   });
 });
 
-// Serve frontend static files (for browser access)
+// Serve frontend static files (local/VM/container only — on Vercel the
+// frontend is served from the CDN via vercel.json routes)
 const frontendDist = path.join(__dirname, '../../frontend/dist');
-console.log(`Looking for frontend dist at: ${frontendDist}`);
-console.log(`Frontend dist exists: ${fs.existsSync(frontendDist)}`);
 
-if (fs.existsSync(frontendDist)) {
-  app.use(express.static(frontendDist));
-  // Catch-all for React Router (avoid capturing /api/*)
-  app.get('*', (req, res) => {
-    if (req.path.startsWith('/api/')) {
-      return res.status(404).json({ error: 'Not found' });
-    }
-    res.sendFile(path.join(frontendDist, 'index.html'));
-  });
-} else {
-  console.log('Frontend dist not found!');
+if (!IS_VERCEL) {
+  console.log(`Looking for frontend dist at: ${frontendDist}`);
+  console.log(`Frontend dist exists: ${fs.existsSync(frontendDist)}`);
+
+  if (fs.existsSync(frontendDist)) {
+    app.use(express.static(frontendDist));
+    // Catch-all for React Router (avoid capturing /api/*)
+    app.get('*', (req, res) => {
+      if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+      res.sendFile(path.join(frontendDist, 'index.html'));
+    });
+  } else {
+    console.log('Frontend dist not found!');
+  }
 }
 
-// Initialize PostgreSQL schema, then start server
-initSchema(db)
+// Initialize PostgreSQL schema once; export the promise so the serverless
+// handler can await it before serving the first request.
+export const ready = initSchema(db)
   .then(() => {
+    if (IS_VERCEL) {
+      // Serverless: Vercel handles listening; the 2 AM Beijing auto-submit
+      // runs via vercel.json crrons -> /api/count/auto-run instead.
+      console.log('日记 backend initialized (Vercel serverless mode)');
+      return;
+    }
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`日记 backend running on http://localhost:${PORT}`);
       console.log(`可从局域网访问: http://0.0.0.0:${PORT}`);
@@ -104,5 +157,7 @@ initSchema(db)
   })
   .catch((err) => {
     console.error('Failed to initialize database schema:', err);
-    process.exit(1);
+    if (!IS_VERCEL) process.exit(1);
   });
+
+export default app;

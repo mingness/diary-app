@@ -10,7 +10,7 @@
     "dev:frontend": "cd frontend && npm run dev",
     "seed": "cd backend && npm run seed",
     "build": "cd frontend && npm run build",
-    "vercel-build": "cd frontend && npm install && npm run build"
+    "vercel-build": "npm install --prefix frontend && cd frontend && npm run build"
   },
   "dependencies": {
     "serverless-http": "^3.2.0"

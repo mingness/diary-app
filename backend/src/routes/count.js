@@ -24,6 +24,20 @@ import db from '../db/index.js';
 const router = Router();
 const COUNT_GOAL = 10_000_000;
 
+// Vercel Cron hits /auto-run with a CRON_SECRET bearer token, NOT a user JWT —
+// mount it BEFORE authMiddleware so the cron request isn't rejected with 401.
+// The endpoint itself validates the cron secret (see /auto-run handler below).
+router.post('/auto-run', async (req, res) => {
+  const cronSecret = process.env.CRON_SECRET;
+  const authHeader = req.headers.authorization || '';
+  const isVercelCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
+  if (!isVercelCron) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  const result = await runAutoSubmitJob();
+  res.json(result);
+});
+
 router.use(authMiddleware);
 
 /** Format a Date as "YYYY-MM-DD HH:MM:SS" in server local time. */
@@ -295,16 +309,8 @@ export async function runAutoSubmitJob() {
   return { submitted, skipped: settings.length - submitted, errors, stats };
 }
 
-/** Internal endpoint to trigger the auto-submit job (for manual testing / cron). */
-router.post('/auto-run', async (req, res) => {
-  // Vercel Cron sends: Authorization: Bearer <CRON_SECRET>
-  const cronSecret = process.env.CRON_SECRET;
-  const authHeader = req.headers.authorization || '';
-  const isVercelCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
-  // Only allow SUPER_ADMIN to trigger manually (or a valid cron secret)
-  if (!isVercelCron && req.userRole !== 'SUPER_ADMIN') {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
+/** SUPER_ADMIN manual trigger — cron path is registered above, before authMiddleware. */
+router.post('/auto-run-manual', requireRole('SUPER_ADMIN'), async (req, res) => {
   const result = await runAutoSubmitJob();
   res.json(result);
 });

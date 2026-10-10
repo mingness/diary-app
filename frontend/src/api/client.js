@@ -18,7 +18,10 @@ function getHeaders(hasBody) {
     headers['Content-Type'] = 'application/json';
   }
   const token = localStorage.getItem('token');
-  const sessionPassword = localStorage.getItem('sessionPassword');
+  // Session password is scoped to the browser session (sessionStorage, cleared on
+  // close) — never persisted long-term. Still sent over HTTPS as X-Session-Key
+  // because the server derives the user's decryption key from it.
+  const sessionPassword = sessionStorage.getItem('sessionPassword');
   if (token) headers.Authorization = `Bearer ${token}`;
   if (sessionPassword) headers['X-Session-Key'] = sessionPassword;
   return headers;

@@ -86,7 +86,7 @@ export function Account() {
         newPassword: form.newPassword || undefined,
       });
       setUser(res.user);
-      if (form.newPassword) localStorage.setItem('sessionPassword', form.newPassword);
+      if (form.newPassword) sessionStorage.setItem('sessionPassword', form.newPassword);
       setForm(f => ({ ...f, oldPassword: '', newPassword: '', confirmPassword: '' }));
       setMsg(t('success'));
     } catch (err) {

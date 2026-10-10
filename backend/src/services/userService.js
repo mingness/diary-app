@@ -37,10 +37,12 @@ export async function listNormalUsers() {
 }
 
 export async function searchUsersByName(pattern) {
-  const sqlPattern = pattern.replace(/\*/g, '%').replace(/\?/g, '_');
+  // Escape user-supplied LIKE wildcards, then apply our own * / ? mapping
+  const escaped = pattern.replace(/([%_\\])/g, '\\$1');
+  const sqlPattern = escaped.replace(/\*/g, '%').replace(/\?/g, '_');
   return db.prepare(`
     SELECT id, user_name, email, role, created_at FROM users
-    WHERE user_name LIKE ?
+    WHERE user_name LIKE ? ESCAPE '\\'
     ORDER BY user_name
   `).all(sqlPattern);
 }

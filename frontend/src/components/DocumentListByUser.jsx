@@ -3,6 +3,7 @@ import { api } from '../api/client';
 import { useLanguage } from '../context/LanguageContext';
 import { LotusSpinner } from './LotusSpinner';
 import { TranslateButtons } from './TranslateButton';
+import { sanitizeHtml } from '../utils/sanitize';
 
 /** Document列表组件-user_name */
 export function DocumentListByUser({ userName, onSelectDoc, showContent = true, showOpenOnly = false }) {
@@ -102,12 +103,12 @@ export function DocumentListByUser({ userName, onSelectDoc, showContent = true, 
                         doc.has_comment ? '✅' : '❌',
                       ].filter(Boolean).join('\t')}
                     </div>
-                    <div dangerouslySetInnerHTML={{ __html: doc.content || '(encrypted)' }} />
+                    <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(doc.content || '(encrypted)') }} />
                     <TranslateButtons html={doc.content} />
                     {doc.comment != null && (
                       <>
                         <div className="doc-comment-label">{t('comment') || 'Comment'}:</div>
-                        <div dangerouslySetInnerHTML={{ __html: doc.comment }} />
+                        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(doc.comment) }} />
                         <TranslateButtons html={doc.comment} />
                       </>
                     )}

@@ -5,6 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { RichEditor } from '../components/RichEditor';
 import { LotusSpinner } from '../components/LotusSpinner';
 import { TranslateButtons } from '../components/TranslateButton';
+import { sanitizeHtml } from '../utils/sanitize';
 
 export function EditDiary() {
   const { id } = useParams();
@@ -118,7 +119,7 @@ export function EditDiary() {
       {comment != null && (
         <div className="card comment-section">
           <h3>{t('comment') || 'Comment'} (SUPER_ADMIN)</h3>
-          <div dangerouslySetInnerHTML={{ __html: comment }} />
+          <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(comment) }} />
           <TranslateButtons html={comment} />
         </div>
       )}
@@ -128,7 +129,7 @@ export function EditDiary() {
           {versions.map((v) => (
             <div key={v.version_number} className="version-item">
               <small>v{v.version_number} — {v.created_at}</small>
-              <div dangerouslySetInnerHTML={{ __html: v.content }} />
+              <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(v.content) }} />
             </div>
           ))}
           <button className="btn-back" onClick={() => setVersions(null)}>{t('back')}</button>

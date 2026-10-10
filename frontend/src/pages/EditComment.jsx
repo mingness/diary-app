@@ -5,6 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { RichEditor } from '../components/RichEditor';
 import { LotusSpinner } from '../components/LotusSpinner';
 import { TranslateButtons } from '../components/TranslateButton';
+import { sanitizeHtml } from '../utils/sanitize';
 
 export function EditComment() {
   const { id } = useParams();
@@ -66,7 +67,7 @@ export function EditComment() {
         <p><b>{t('titleField')}:</b> {doc.title}</p>
         <p><b>{t('date')}:</b> {doc.date}</p>
         <p><b>{t('userName')}:</b> {doc.user_name}</p>
-        <div><b>{t('content')}:</b><div dangerouslySetInnerHTML={{ __html: doc.content }} /></div>
+        <div><b>{t('content')}:</b><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(doc.content) }} /></div>
         <TranslateButtons html={doc.content} />
 
         <div style={{ margin: '16px 0', padding: '12px', background: '#f5f5f5', borderRadius: '4px' }}>

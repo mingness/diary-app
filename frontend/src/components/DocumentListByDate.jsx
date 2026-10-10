@@ -3,6 +3,7 @@ import { api } from '../api/client';
 import { useLanguage } from '../context/LanguageContext';
 import { LotusSpinner } from './LotusSpinner';
 import { TranslateButtons } from './TranslateButton';
+import { sanitizeHtml } from '../utils/sanitize';
 
 /** Document列表组件-date */
 export function DocumentListByDate({ date, onSelectDoc }) {
@@ -92,14 +93,14 @@ export function DocumentListByDate({ date, onSelectDoc }) {
                     </div>
                     {doc.content != null && (
                       <>
-                        <div dangerouslySetInnerHTML={{ __html: doc.content }} />
+                        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(doc.content) }} />
                         <TranslateButtons html={doc.content} />
                       </>
                     )}
                     {doc.comment != null && (
                       <>
                         <div className="doc-comment-label">{t('comment') || 'Comment'}:</div>
-                        <div dangerouslySetInnerHTML={{ __html: doc.comment }} />
+                        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(doc.comment) }} />
                         <TranslateButtons html={doc.comment} />
                       </>
                     )}

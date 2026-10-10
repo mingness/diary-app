@@ -5,12 +5,22 @@ import jwt from 'jsonwebtoken';
 import { deriveUserMasterKey } from '../crypto/encryption.js';
 import { getUserByName } from '../services/userService.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  // Fail fast — a missing/weak secret allows token forgery (auth bypass).
+  // Only allow local development without a secret.
+  if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET environment variable is required in production');
+  }
+  console.warn('[auth] JWT_SECRET not set — using insecure dev secret (LOCAL ONLY)');
+}
+
+const JWT_SECRET_VALUE = JWT_SECRET || 'dev-secret-change-in-production';
 
 export function signToken(user) {
   return jwt.sign(
     { userName: user.user_name, role: user.role, id: user.id },
-    JWT_SECRET,
+    JWT_SECRET_VALUE,
     { expiresIn: '8h' }
   );
 }
@@ -21,7 +31,7 @@ export async function authMiddleware(req, res, next) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = jwt.verify(token, JWT_SECRET_VALUE);
     const user = await getUserByName(payload.userName);
     if (!user) return res.status(401).json({ error: 'User not found' });
     req.user = user;

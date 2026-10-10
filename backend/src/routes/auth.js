@@ -10,6 +10,7 @@ import {
 } from '../services/userService.js';
 import { generateCaptcha, verifyCaptcha } from '../services/captchaService.js';
 import { signToken } from '../middleware/auth.js';
+import { loginLimiter, registerLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
 
@@ -17,7 +18,7 @@ router.get('/captcha', async (req, res) => {
   res.json(await generateCaptcha());
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   const { userName, password, captchaId, captchaAnswer } = req.body;
   if (!(await verifyCaptcha(captchaId, captchaAnswer))) {
     return res.status(400).json({ error: 'Captcha verification failed', errorZh: '人类验证失败' });
@@ -35,12 +36,19 @@ router.post('/login', async (req, res) => {
     }
   }
   const token = signToken(user);
-  res.cookie('token', token, { httpOnly: true, sameSite: 'lax', maxAge: 8 * 3600 * 1000 });
+  // secure: HTTPS-only on Vercel (http local dev still works — browsers
+  // accept secure cookies on localhost); sameSite lax mitigates CSRF on POST.
+  res.cookie('token', token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: !!process.env.VERCEL,
+    maxAge: 8 * 3600 * 1000,
+  });
   res.json({ user: formattedUser, token });
 });
 
 // Auto-login for Android app with saved credentials (no captcha required)
-router.post('/auto-login', async (req, res) => {
+router.post('/auto-login', loginLimiter, async (req, res) => {
   const { userName, password } = req.body;
   if (!userName || !password) {
     return res.status(400).json({ error: 'Missing credentials', errorZh: '缺少凭据' });
@@ -62,8 +70,11 @@ router.post('/auto-login', async (req, res) => {
   res.json({ user: formattedUser, token });
 });
 
-router.post('/register', async (req, res) => {
+router.post('/register', registerLimiter, async (req, res) => {
   const { userName, password, familyName = '', givenName = '', address = '' } = req.body;
+  if (!password || String(password).length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters', errorZh: '密码至少 8 个字符' });
+  }
   if (await getUserByName(userName)) {
     return res.status(400).json({ error: 'Username taken', errorZh: '用户名已存在' });
   }
@@ -80,7 +91,7 @@ router.post('/register', async (req, res) => {
   res.json({ success: true });
 });
 
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', registerLimiter, async (req, res) => {
   const { userName } = req.body;
   const user = await getUserByName(userName);
   if (!user) {

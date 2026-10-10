@@ -19,8 +19,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// CORS whitelist — reflect only known origins; same-origin/Android WebView
+// requests have no Origin header and pass through. Set ALLOWED_ORIGINS
+// (comma-separated) to extend, e.g. custom domain.
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: true,
+  origin: (origin, callback) => {
+    // No origin (same-origin, curl, Android WebView) — allow
+    if (!origin) return callback(null, true);
+    if (ALLOWED_ORIGINS.length === 0) return callback(null, true); // not configured yet
+    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    return callback(null, false); // deny silently (no CORS headers)
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -35,7 +49,15 @@ if (!IS_VERCEL) {
 }
 
 import multer from 'multer';
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_IMAGE_TYPES.includes(file.mimetype)) return cb(null, true);
+    cb(new Error('Only image uploads are allowed'));
+  },
+});
 
 if (IS_VERCEL) {
   // Serverless: filesystem is ephemeral — store uploads in Postgres and

@@ -5,7 +5,7 @@ const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [sessionPassword, setSessionPassword] = useState(() => localStorage.getItem('sessionPassword'));
+  const [sessionPassword, setSessionPassword] = useState(() => sessionStorage.getItem('sessionPassword'));
   const [token, setToken] = useState(() => localStorage.getItem('token'));
   const [loading, setLoading] = useState(!!localStorage.getItem('token'));
 
@@ -24,7 +24,7 @@ export function AuthProvider({ children }) {
       .catch(() => {
         // Token invalid or expired
         localStorage.removeItem('token');
-        localStorage.removeItem('sessionPassword');
+        sessionStorage.removeItem('sessionPassword');
         setToken(null);
         setSessionPassword(null);
         setLoading(false);
@@ -37,7 +37,7 @@ export function AuthProvider({ children }) {
     setSessionPassword(password);
     setToken(res.token);
     localStorage.setItem('token', res.token);
-    localStorage.setItem('sessionPassword', password);
+    sessionStorage.setItem('sessionPassword', password);
     // Save credentials to Android SharedPreferences for auto-login
     if (typeof window !== 'undefined' && window.AndroidBridge && window.AndroidBridge.saveCredentials) {
       try { window.AndroidBridge.saveCredentials(userName, password); } catch {}
@@ -51,7 +51,7 @@ export function AuthProvider({ children }) {
     setSessionPassword(password);
     setToken(res.token);
     localStorage.setItem('token', res.token);
-    localStorage.setItem('sessionPassword', password);
+    sessionStorage.setItem('sessionPassword', password);
     return res.user;
   }, []);
 
@@ -65,7 +65,7 @@ export function AuthProvider({ children }) {
     setSessionPassword(null);
     setToken(null);
     localStorage.removeItem('token');
-    localStorage.removeItem('sessionPassword');
+    sessionStorage.removeItem('sessionPassword');
     // Clear saved credentials in Android
     if (typeof window !== 'undefined' && window.AndroidBridge && window.AndroidBridge.clearCredentials) {
       try { window.AndroidBridge.clearCredentials(); } catch {}

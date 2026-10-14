@@ -11,6 +11,12 @@ export const ErrorCode = {
   PayloadTooLarge: 'payload_too_large',
   NotReady: 'not_ready',
   Internal: 'internal_error',
+  Unauthorized: 'unauthorized',
+  Forbidden: 'forbidden',
+  /** A sharing change that isn't allowed from the entry's current state (docs/ARCHITECTURE.md §7.2). */
+  InvalidTransition: 'invalid_transition',
+  /** The entry has never been submitted, so it can't be shared or reviewed yet. */
+  NotSubmitted: 'not_submitted',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 
@@ -38,3 +44,13 @@ export type ReadyBody = z.infer<typeof ReadyBody>;
 
 /** Header carrying the request ID back to the client, for "error ref" in toasts. */
 export const REQUEST_ID_HEADER = 'x-request-id';
+
+/** Account roles. Each account has exactly one (docs/project_prompt.md §2). */
+export const Role = z.enum(['NORMAL_USER', 'COURSE_LEADER', 'SYS_ADMIN']);
+export type Role = z.infer<typeof Role>;
+
+/** Who can read a diary entry besides its owner and the course leaders (§5.3). */
+export const Access = z.enum(['private', 'wait_for_open', 'open']);
+export type Access = z.infer<typeof Access>;
+
+export * from './count.js';

@@ -66,7 +66,7 @@ just hue.
 |---|---|---|
 | NORMAL_USER | 日記 · 開放日記 · 報數 · 我的 | same four, as top links |
 | COURSE_LEADER | 批閱 · 申請 (badge) · 日記 · 報數 · 我的 | 批閱 · 開放申請 (badge) · 我的日記 · 開放日記 · 報數 · avatar |
-| SYS_ADMIN | 用戶 · 日記 · 報數 · 重設 (badge) · 我的 | 用戶 · 日記管理 · 報數管理 · 密碼重設 (badge) · username |
+| SYS_ADMIN | 用戶 (badge) · 日記 · 報數 · 重設 (badge) · 我的 | 注意 (badge) · 用戶 · 日記管理 · 報數管理 · 密碼重設 (badge) · username |
 
 - The tab bar replaces the spec's My Diary / Open Diary toggle and its scattered header buttons (§6.2, §7.4).
   "Go Diary" from the count page is simply the 日記 tab.
@@ -108,17 +108,26 @@ Each screen lists what it needs from the API. The API column feeds the ARCHITECT
 ### 4.3 Editor (users and leaders, own entries)
 
 - **Header:** back, title, and a save status ("已暫存 10:42" / "儲存中…" / "未儲存的修改" / "離線，稍後再試").
-- **Fields:** title and date, then a toolbar that wraps on phones (font, paragraph style, size, B, U, 圖片).
+- **Fields:** title, the date shown read-only (set when the entry was created; a short help line explains that
+  entries can't be backdated), then a toolbar that wraps on phones (font, paragraph style, size, B, U, 圖片).
 - **Body** in the serif face.
 - **Image insert:** the picker accepts the photo library and camera. After downscaling (ARCHITECTURE §8.3) an
-  info notice reports original → new size and that location data was removed.
+  info notice reports original → new size and that location data was removed. After the second photo the 圖片
+  button is disabled, with the note "每篇最多 2 張相片".
+- **Length:** from 4,000 characters a quiet counter appears ("4,200 / 5,000"), turning amber, never red, near the
+  limit, with the kindly framed line from spec §5.5. Over 5,000, 暫存 still works and 提交/更新 is disabled with
+  the reason.
+- **Limits reached:** a notice names the limit and when it resets (midnight Beijing time); the text stays in the
+  editor.
 - **Share request:** a checkbox row "申請開放給大家閱讀", disabled with a hint until the entry has been
   submitted once.
-- **Sticky bottom bar:** 暫存 (secondary), 提交 (primary), 歷史版本. Enable and disable follow spec §5.2.
+- **Sticky bottom bar:** 暫存 (secondary), 提交 (primary; reads **更新** once the entry has been submitted),
+  歷史版本. Enable and disable follow spec §5.2.
 - **History** opens as a bottom sheet (phone) or side panel (desktop) listing the versions, each expandable.
 - **Leaving with unsaved changes** shows a confirm dialog. Autosave runs every 5 minutes, plus when the app
   goes to the background (`visibilitychange`), so a phone being locked doesn't lose text.
 - **API:** `GET documents/:id` (with draft), `PUT draft`, `POST submit`, `GET versions`, `POST access`.
+  Limit values come from `shared/src/limits.ts`.
 
 ### 4.4 Entry view (owner, leaders, readers of open entries)
 
@@ -127,7 +136,7 @@ Each screen lists what it needs from the API. The API column feeds the ARCHITECT
 - **Translation:** 翻譯 and Translate buttons, with the result shown as plain text below them.
 - **Comments:** the `Comment:` label, then one card per submitted comment (leader name, date, text, its own
   translate buttons).
-- **Owner actions:** 編輯 (opens 4.3) and the share request toggle.
+- **Owner actions:** 編輯 (opens 4.3), and the share request toggle.
 - **Open Diary tab:** the same screen without the owner actions, reached from a list of open entries by month.
 - **API:** `GET documents/:id` → content + submitted comments `{id, authorName, submittedAt, body}`;
   `POST translate {documentId|commentId, direction}`.
@@ -138,7 +147,9 @@ Each screen lists what it needs from the API. The API column feeds the ARCHITECT
 - **Stats:** one progress card leads. The all-time total is the largest number on the page; under it, a thick
   progress bar; under that, the goal (10,000,000) and the percentage completed side by side, in large type. Below it, a slim "reported today"
   row (sum + number of entries). There is no separate goal tile (agreed).
-- **Input card:** 今日報數 with a numeric keypad, 提交, and the 自動報數 checkbox with "每天北京時間凌晨 2:00".
+- **Input card:** 今日報數 with a numeric keypad, a date choice (今天 by default, or one of the previous 5 days,
+  shown as short weekday chips), 提交, and the 自動報數 checkbox with "每天北京時間凌晨 2:00". After 10 entries for
+  the chosen date, 提交 is disabled with the reason.
   Trimming and clamping happen as the user types, with the notice in a live region.
 - **Latest 20:** on phones this is a list, not a 5-column table. Each row shows name and today's count, then a
   muted line "總計 · 首次 · 最近". Rows alternate colours and auto-submit names are blue (spec §7.1). On desktop
@@ -149,6 +160,7 @@ Each screen lists what it needs from the API. The API column feeds the ARCHITECT
 
 - **Profile:** photo (picked and resized to 300×300 in the browser), name, address, email, 儲存.
 - **Appearance:** text size (with a live preview) and theme (淺色 / 深色 / 跟隨裝置).
+- **Storage used:** one information row ("已使用 12.4 MB"), no limit or warning.
 - **Signed-in devices:** device name from the user agent, "this device" marker, last used, and 登出 for each.
 - **Rows:** change password (a sheet), "加到手機主畫面" (the install how-to), 登出.
 - **SYS_ADMIN:** an authenticator section.
@@ -178,16 +190,23 @@ Three panes, which stack on narrow screens:
 
 ### 4.8 SYS_ADMIN (desktop first)
 
+- **注意 (Attention):** on desktop its own top-bar item; on phones the top of the 用戶 tab (the tab carries
+  the badge). Unhandled flags, newest first: username, rule ("已達每日提交上限", "多次登入失敗", "一天內多個新裝置"),
+  time, and actions 查看活動 / 登出所有裝置 / 鎖定帳戶 (confirm) / 已處理. A status line shows whether email
+  alerts are on ("電郵通知：未設定" or the recipient count and last send).
+- **Activity:** per user, a 7-day summary (entries, submissions, updates, count entries, storage) and the event
+  list. Metadata only.
 - **用戶:** search with `?` / `*`, a role filter, and a table (checkbox, username, name, role chip, status
-  including "等待重設密碼" and "已啟用驗證器", created date, 編輯 / 刪除). Batch delete applies to selected
+  including "等待重設密碼" and "已啟用驗證器", storage used, created date, 編輯 / 刪除). Batch delete applies to selected
   normal users only. Side cards show pending resets and the last auto-submit run.
 - **新增 / 編輯用戶:** role, email, names, address, photo, and an optional new password (generated passwords are
   shown once in a dialog with a copy button).
 - **日記管理:** search by username and/or date; the table shows title, date, owner and state; delete with confirm.
-- **報數管理:** all users, an auto-submit toggle per row, delete entries per row (confirm), job-run history,
+- **報數管理:** all users, an auto-submit toggle per row, delete entries per row (all, or a count-date range;
+  confirm), job-run history,
   and 立即執行.
 - **密碼重設:** the pending list. Each row has 產生 (an 8-character password shown once) or a typed password.
-- **API:** as in ARCHITECTURE §7.3. User rows need `role, status, totpEnabled, createdAt`.
+- **API:** as in ARCHITECTURE §7.3. User rows need `role, status, totpEnabled, storageBytes, createdAt`.
 
 ## 5. Components
 
@@ -219,7 +238,8 @@ snapshot at 360 px and 1280 px.
   有新文件 / 有新批注. "攥写日记" in spec §6.2 is a typo for **撰寫日記** (F5, agreed).
 - English UI name: **Cultivation Diary** for 修行日記 (agreed). 報數 is "Count", 批注 is
   "comment", 導師 is "course leader" ("Leader …" before a name), and 學員 is "student".
-- Every string lives in `web/src/i18n/{zh-Hant,en}.ts`. Dates use `Intl.DateTimeFormat` with the active locale
+- Every string lives in `web/src/i18n/{zh-Hant,en}.ts` (alert emails, written by the server, use
+  `server/src/i18n/`; ARCHITECTURE §8.10). Dates use `Intl.DateTimeFormat` with the active locale
   (10月14日 週三 / Wed 14 Oct).
 
 ## 8. Accessibility checklist

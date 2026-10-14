@@ -18,6 +18,11 @@ export default tseslint.config(
     },
   },
   {
+    // In tests a missing value fails the test anyway, so `!` is a harmless shorthand there.
+    files: ['**/test/**'],
+    rules: { '@typescript-eslint/no-non-null-assertion': 'off' },
+  },
+  {
     files: ['scripts/**'],
     rules: { 'no-console': 'off' },
   },

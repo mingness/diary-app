@@ -15,6 +15,32 @@ const migrationsDir = loadConfig({
   CRON_SECRET: '4'.repeat(32),
 }).migrationsDir;
 
+/** The slice of an OpenAPI operation this file checks. */
+interface OpenApiOperation {
+  responses?: Record<string, { content?: Record<string, { schema?: unknown }> }>;
+}
+
+/**
+ * Runs `fn` against an app whose database can't be reached, for paths that must work (or fail cleanly)
+ * without one.
+ */
+async function withUnreachableDatabase(
+  apiDocs: boolean,
+  fn: (app: FastifyInstance) => Promise<void>,
+): Promise<void> {
+  const unreachable = createDatabase('postgres://nobody:nothing@127.0.0.1:1/none');
+  const app = await buildApp({
+    config: { logLevel: 'fatal', migrationsDir, apiDocs },
+    database: unreachable,
+  });
+  try {
+    await fn(app);
+  } finally {
+    await app.close();
+    await unreachable.close();
+  }
+}
+
 /** Collects every log line the app writes, to check what does and doesn't get logged. */
 function captureLogs() {
   const lines: string[] = [];
@@ -50,50 +76,44 @@ describe('server skeleton', () => {
   });
 
   describe('readiness', () => {
-    it('reports not ready before migrations have run', async () => {
-      const res = await app.inject({ method: 'GET', url: '/readyz' });
-      expect(res.statusCode).toBe(503);
-      expect(ReadyBody.parse(res.json())).toEqual({
+    // One test, because each step depends on the database state the previous one left.
+    it('is not ready on an empty database, ready once migrated, and re-migrating is a no-op', async () => {
+      const before = await app.inject({ method: 'GET', url: '/readyz' });
+      expect(before.statusCode).toBe(503);
+      expect(ReadyBody.parse(before.json())).toEqual({
         status: 'not_ready',
         checks: { database: true, migrations: false },
       });
-    });
 
-    it('reports ready once migrations are applied from an empty database', async () => {
       await runMigrations(testDb.database, migrationsDir);
-      const res = await app.inject({ method: 'GET', url: '/readyz' });
-      expect(res.statusCode).toBe(200);
-      expect(res.json()).toEqual({ status: 'ready', checks: { database: true, migrations: true } });
-    });
+      const after = await app.inject({ method: 'GET', url: '/readyz' });
+      expect(after.statusCode).toBe(200);
+      expect(after.json()).toEqual({
+        status: 'ready',
+        checks: { database: true, migrations: true },
+      });
 
-    it('applying migrations twice is a no-op', async () => {
       await expect(runMigrations(testDb.database, migrationsDir)).resolves.toBeUndefined();
     });
 
     it('reports the database as down when it cannot be reached', async () => {
-      const unreachable = createDatabase('postgres://nobody:nothing@127.0.0.1:1/none');
-      const downApp = await buildApp({
-        config: { logLevel: 'fatal', migrationsDir, apiDocs: false },
-        database: unreachable,
-      });
-      try {
+      await withUnreachableDatabase(false, async (downApp) => {
         const res = await downApp.inject({ method: 'GET', url: '/readyz' });
         expect(res.statusCode).toBe(503);
         expect(res.json()).toEqual({
           status: 'not_ready',
           checks: { database: false, migrations: false },
         });
-      } finally {
-        await downApp.close();
-        await unreachable.close();
-      }
+      });
     });
   });
 
   it('GET /healthz answers without touching the database', async () => {
-    const res = await app.inject({ method: 'GET', url: '/healthz' });
-    expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ status: 'ok' });
+    await withUnreachableDatabase(false, async (downApp) => {
+      const res = await downApp.inject({ method: 'GET', url: '/healthz' });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ status: 'ok' });
+    });
   });
 
   describe('errors', () => {
@@ -170,11 +190,25 @@ describe('server skeleton', () => {
       const spec = res.json();
       expect(spec.openapi).toMatch(/^3\./);
       expect(Object.keys(spec.paths)).toEqual(expect.arrayContaining(['/healthz', '/readyz']));
-      expect(spec.paths['/readyz'].get.responses).toHaveProperty('503');
-      // Test-only routes have no schema but still appear; real routes must always declare one.
-      expect(
-        spec.paths['/healthz'].get.responses['200'].content['application/json'].schema,
-      ).toBeDefined();
+    });
+
+    // Enforces the AGENTS.md rule: a route without a response schema is incomplete.
+    it('every real route declares a JSON schema for each of its responses', async () => {
+      const spec = (await app.inject({ method: 'GET', url: `${API_DOCS_PATH}/json` })).json();
+      const missing: string[] = [];
+      for (const [path, methods] of Object.entries<Record<string, OpenApiOperation>>(spec.paths)) {
+        if (path.startsWith('/test/')) continue;
+        for (const [method, operation] of Object.entries(methods)) {
+          const responses = Object.entries(operation.responses ?? {});
+          if (responses.length === 0) missing.push(`${method} ${path}: no responses`);
+          for (const [status, response] of responses) {
+            if (!response.content?.['application/json']?.schema) {
+              missing.push(`${method} ${path} ${status}`);
+            }
+          }
+        }
+      }
+      expect(missing).toEqual([]);
     });
 
     it('serves the explorer page itself from bundled assets', async () => {
@@ -185,19 +219,11 @@ describe('server skeleton', () => {
     });
 
     it('is absent when API_DOCS is off (production default)', async () => {
-      const unused = createDatabase('postgres://nobody:nothing@127.0.0.1:1/none');
-      const prodApp = await buildApp({
-        config: { logLevel: 'fatal', migrationsDir, apiDocs: false },
-        database: unused,
-      });
-      try {
+      await withUnreachableDatabase(false, async (prodApp) => {
         for (const url of [API_DOCS_PATH, `${API_DOCS_PATH}/`, `${API_DOCS_PATH}/json`]) {
           expect((await prodApp.inject({ method: 'GET', url })).statusCode).toBe(404);
         }
-      } finally {
-        await prodApp.close();
-        await unused.close();
-      }
+      });
     });
   });
 });

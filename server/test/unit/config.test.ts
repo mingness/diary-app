@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ConfigError, loadConfig, parseKeyring } from '../../src/config.js';
+import { ConfigError, loadConfig } from '../../src/config.js';
 
 const hex = (char: string) => char.repeat(64);
 const realisticHex = 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90';
@@ -26,25 +26,6 @@ function configErrorFor(env: Record<string, string | undefined>): ConfigError {
   throw new Error('expected loadConfig to throw');
 }
 
-describe('parseKeyring', () => {
-  it('uses the first entry as the current key', () => {
-    const ring = parseKeyring(`v2:${hex('b')},v1:${hex('a')}`);
-    expect(ring?.current).toBe(2);
-    expect(ring?.keys.get(1)).toEqual(Buffer.from(hex('a'), 'hex'));
-    expect(ring?.keys.get(2)?.length).toBe(32);
-  });
-
-  it.each([
-    ['empty', ''],
-    ['no version', hex('a')],
-    ['short key', 'v1:abcd'],
-    ['not hex', `v1:${'z'.repeat(64)}`],
-    ['duplicate version', `v1:${hex('a')},v1:${hex('b')}`],
-  ])('rejects %s', (_label, raw) => {
-    expect(parseKeyring(raw)).toBeNull();
-  });
-});
-
 describe('loadConfig', () => {
   it('loads a valid environment with defaults', () => {
     const config = loadConfig(validEnv());
@@ -64,6 +45,18 @@ describe('loadConfig', () => {
       'PROFILE_KEYRING',
       'SESSION_SECRET',
     ]);
+  });
+
+  it('reports keyring and production problems alongside other invalid variables', () => {
+    const err = configErrorFor(
+      validEnv({
+        NODE_ENV: 'production',
+        DATABASE_URL: undefined,
+        DIARY_KEYRING: 'v1:nothex',
+        CRON_SECRET: 'change-me-change-me-change-me-change-me',
+      }),
+    );
+    expect(err.invalidVariables).toEqual(['CRON_SECRET', 'DATABASE_URL', 'DIARY_KEYRING']);
   });
 
   it('rejects a malformed keyring by name', () => {

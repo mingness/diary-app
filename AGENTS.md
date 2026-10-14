@@ -27,7 +27,8 @@ Keep this file up to date when commands, conventions or pitfalls change.
 
 - `shared/`: zod schemas and types used by both server and web. Error codes live here.
 - `server/src/`: `main.ts` (process entry), `app.ts` (builds Fastify; tests use it), `config.ts`, `db/`,
-  `routes/`. Pure logic will live in `server/src/domain/` with no HTTP or DB code.
+  `routes/`. Pure logic lives in `server/src/domain/` (crypto, authz, diary, count) with no HTTP or DB code;
+  rules shared with the web app (e.g. 報數 input) live in `shared/src/`.
 - `server/test/unit/` and `server/test/integration/`; helpers in `server/test/helpers/`. The test scripts also
   work from inside `server/` (`npm test`, `npm run test:unit`, …); they share the root `vitest.config.ts`.
 - `db/migrations/`: generated SQL plus `meta/_journal.json`. Append-only once shipped.
@@ -38,6 +39,12 @@ Keep this file up to date when commands, conventions or pitfalls change.
   `npm run check` green and `docker compose up` working. Nothing half-built is reachable.
 - **Tests ship with the code.** A bug fix starts with a failing test. Integration tests cover every role,
   allowed and denied.
+- **What to test.** Unit tests pin exact input → output where the spec defines it (permission tables, 報數
+  input, Beijing dates) and exercise the error paths that are hard to hit for real (tampered data, missing
+  keys, bad config). Integration tests check that the pieces work together, not logic the unit tests already
+  prove. Before adding a test, name the bug only it would catch. Skip tests of Node or library behaviour,
+  copies of the code's own tables, repeats of an exhaustive table's rows, and names that promise more than
+  the test checks.
 - **Ask before:** adding a runtime dependency, changing encryption or key handling, changing the auth flow, or
   writing a destructive migration.
 - **Routes declare zod schemas** for params, body and every response (use `app.withTypeProvider<ZodTypeProvider>()`).

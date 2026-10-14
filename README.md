@@ -7,8 +7,9 @@ daily-count (報數) activity. Diaries are encrypted at rest; account administra
 - How it's built: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), screens in [docs/FRONTEND.md](docs/FRONTEND.md)
 - Working on it: [AGENTS.md](AGENTS.md)
 
-**Status:** Phase A, slice 1 (skeleton). The API serves health checks only; features arrive slice by slice
-(see the delivery plan in ARCHITECTURE.md §11).
+**Status:** Phase A, slice 2 of 10 done (skeleton; core domain: encryption, permissions, sharing rules,
+報數 input and Beijing-time scheduling). The API serves health checks only so far; features arrive slice by
+slice (see the delivery plan in ARCHITECTURE.md §11).
 
 ## Quick start
 

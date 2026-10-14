@@ -5,14 +5,11 @@
  * error messages, because most of them are secrets.
  */
 import { z } from 'zod';
+import { parseKeyring, type Keyring } from './domain/crypto/keyring.js';
+
+export type { Keyring };
 
 export type Env = 'development' | 'test' | 'production';
-
-/** A versioned set of 32-byte keys; `current` is used for new encryption, older versions only for reading. */
-export interface Keyring {
-  readonly current: number;
-  readonly keys: ReadonlyMap<number, Buffer>;
-}
 
 export interface Config {
   readonly env: Env;
@@ -34,26 +31,6 @@ export class ConfigError extends Error {
     super(`Invalid or missing configuration: ${invalidVariables.join(', ')}`);
     this.name = 'ConfigError';
   }
-}
-
-const KEYRING_ENTRY = /^v(\d{1,4}):([0-9a-f]{64})$/i;
-
-/**
- * Parses `v2:<64 hex>,v1:<64 hex>`. The first entry is the current key.
- * Returns null for any malformed input; callers report the variable name.
- */
-export function parseKeyring(raw: string): Keyring | null {
-  const keys = new Map<number, Buffer>();
-  let current: number | undefined;
-  for (const part of raw.split(',')) {
-    const [, versionText, keyHex] = KEYRING_ENTRY.exec(part.trim()) ?? [];
-    if (versionText === undefined || keyHex === undefined) return null;
-    const version = Number(versionText);
-    if (keys.has(version)) return null;
-    keys.set(version, Buffer.from(keyHex, 'hex'));
-    current ??= version;
-  }
-  return current === undefined ? null : { current, keys };
 }
 
 /**
@@ -93,25 +70,29 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
   const invalid = new Set<string>();
   if (!parsed.success) {
     for (const issue of parsed.error.issues) invalid.add(String(issue.path[0]));
-    throw new ConfigError([...invalid].sort());
   }
-  const e = parsed.data;
 
-  const diaryKeyring = parseKeyring(e.DIARY_KEYRING);
-  const profileKeyring = parseKeyring(e.PROFILE_KEYRING);
+  // The checks below read the raw values, so they still run when the schema failed on another variable and
+  // one deploy attempt reports every problem.
+  const diaryKeyring = env.DIARY_KEYRING ? parseKeyring(env.DIARY_KEYRING) : null;
+  const profileKeyring = env.PROFILE_KEYRING ? parseKeyring(env.PROFILE_KEYRING) : null;
   if (!diaryKeyring) invalid.add('DIARY_KEYRING');
   if (!profileKeyring) invalid.add('PROFILE_KEYRING');
 
-  if (e.NODE_ENV === 'production') {
+  if (env.NODE_ENV === 'production') {
     for (const name of SECRET_VARS) {
-      if (looksLikeDummy(e[name])) invalid.add(name);
+      const value = env[name];
+      if (value !== undefined && looksLikeDummy(value)) invalid.add(name);
     }
-    if (e.DIARY_KEYRING === e.PROFILE_KEYRING) invalid.add('PROFILE_KEYRING');
+    if (env.DIARY_KEYRING && env.DIARY_KEYRING === env.PROFILE_KEYRING) {
+      invalid.add('PROFILE_KEYRING');
+    }
   }
 
-  if (invalid.size > 0 || !diaryKeyring || !profileKeyring) {
+  if (!parsed.success || invalid.size > 0 || !diaryKeyring || !profileKeyring) {
     throw new ConfigError([...invalid].sort());
   }
+  const e = parsed.data;
 
   return {
     env: e.NODE_ENV,

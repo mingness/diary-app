@@ -2,7 +2,8 @@
 
 > **Purpose:** a complete functional specification for an AI coding agent to build this application **from scratch** (a web app, installable on phones). It describes *what the app must do and how it flows* — not how the existing code is written.
 > Consolidated from the original requirement rounds (old project `F:\ai_workspace\diary_webapp`) and the deployed, many-times-revised behavior (`F:\ai_workspace\diary-app`).
-> **Revised 2026-10-14:** multiple course leaders and SYS_ADMINs, server-held encryption keys, installable web app instead of an Android app. Design decisions are recorded in `docs/ARCHITECTURE.md`.
+> **Revised 2026-10-14:** multiple course leaders and SYS_ADMINs, server-held encryption keys, installable web app instead of an Android app; usage limits and
+> SYS_ADMIN activity alerts. Design decisions are recorded in `docs/ARCHITECTURE.md`.
 > App title: **修行日記** (English: **Cultivation Diary**) · Languages: 繁體中文 (default) / English, switchable everywhere.
 
 ---
@@ -40,11 +41,11 @@ This is a private diary platform with a supervision workflow:
 
 **user profile** — username (immutable), password, email, address, photo (auto-resized to 300×300 on selection), family name, given name, preferred font size.
 
-**document (diary)** — title (stored in plaintext), content (**encrypted**), date, submitted flag (never submitted / submitted), current unsubmitted draft (**encrypted**), accessibility state (`Private` / `Wait for open` / `Open`), and up to **3 submitted history versions** (**encrypted**).
+**document (diary)** — title (stored in plaintext), content (**encrypted**), date (the Beijing date on which the entry was **created**, set by the server; a user may write several entries on one date, but can never choose or change the date), submitted flag (never submitted / submitted), current unsubmitted draft (**encrypted**), accessibility state (`Private` / `Wait for open` / `Open`), and up to **3 submitted history versions** (**encrypted**).
 
 **comment** — belongs to one document and one course leader; text (**encrypted**); state (draft / submitted). Each course leader has at most one comment per document, which they may edit and resubmit.
 
-**count entry** — username, daily count (positive integer, 1–1080), submit time, auto-submit flag.
+**count entry** — username, daily count (positive integer, 1–1080), count date (today or up to 5 days earlier, Beijing time), submit time, auto-submit flag.
 
 **Encryption requirements (non-negotiable):**
 - Diary content, drafts, history versions and comments are encrypted with **AES-256-GCM**, with a unique random nonce per encryption.
@@ -78,6 +79,7 @@ This is a private diary platform with a supervision workflow:
 - Text size: 標準 / 大 / 特大 / 超大 (16 / 18 / 20 / 22 px), default 大 (18 px). Many users are older; every page must stay usable at the largest size.
 - Change password: current password + new password + confirm; mismatch → "两次密码输入不同", nothing changes. Other sessions are signed out.
 - Signed-in devices, each with a sign-out button.
+- Storage used: the total size of the user's entries (including drafts and history versions) and profile photo. Shown for information only; there is no storage limit (§5.5).
 - Theme: light / dark / follow the device.
 - SYS_ADMIN: set up / reset the authenticator app.
 - Logout.
@@ -87,20 +89,22 @@ This is a private diary platform with a supervision workflow:
 ### 5.1 Lifecycle
 ```
 create → edit → 暂存 (draft, any number of times, auto-saved every 5 min)   ← visible to the owner only
-       → 提交 (submit; keeps the previous content as a history version, max 3)  ← now visible to course leaders
+       → 提交 (first submit)                                                  ← now visible to course leaders
+       → 更新 (update; keeps the previous content as a history version, max 3)
 → optional: request open → Wait for open → a course leader confirms → Open
                                                 └ or denies/reverts → Private
 course leader reads → writes comment draft (invisible) → submits comment (visible)
 ```
-- After a diary has been submitted, the owner may keep editing and drafting; course leaders continue to see the **last submitted** version until the owner submits again.
+- After a diary has been submitted, the owner may keep editing and drafting; course leaders continue to see the **last submitted** version until the owner updates it.
+- **No backdating.** An entry records a thought of the moment, so its date is the day it was created. An entry started on Monday and submitted on Saturday keeps Monday's date; an entry first written on Saturday is dated Saturday. The help text says so.
 
 ### 5.2 Editor (used for diary content and for a course leader's comment)
 - Title input on top; rich-text body: font family, font size, underline, bold, headings (Title, H1–H3), insert local image.
 - Images are processed before insertion so phone photos need no manual preparation: any image over 500 KB or over 1600 px on its long edge is **automatically downscaled** (to fit 1600 px) and lossy-compressed, and the user is told what was done (original and new size). Photo metadata (including location) is removed. Images are embedded inline with the text. The server rejects images and documents over its size limits with a clear message.
 - Bottom buttons **暂存 | 提交 | 历史版本**:
-  - Both start disabled; become active as soon as the text (or title/date/open-access) changes.
+  - Both start disabled; become active as soon as the text (or title/open-access) changes.
   - 暂存 saves a draft, then deactivates itself while 提交 becomes active. Auto-draft every 5 minutes while dirty.
-  - 提交 saves, archives the previous submitted content into history (max 3 versions), marks the document submitted, then deactivates. Re-entering an already-submitted document does not re-activate 提交 until something changes.
+  - 提交 saves, marks the document submitted, then deactivates. Once the document has been submitted, the button reads **更新** (update): it saves, archives the previous submitted content into history (max 3 versions), then deactivates. Re-entering an already-submitted document does not re-activate it until something changes.
   - 历史版本 lists the stored versions (version number + time + content) and can collapse.
 - **No cursor-jump-to-start bug** is acceptable in the comment editor — the initial text must load without moving the caret.
 - After submitting, content must survive re-entry exactly as saved.
@@ -122,6 +126,26 @@ Owner or any COURSE_LEADER unchecks → state = 'Private'
 - A course leader's 提交 comment → visible to the owner (and, for Open diaries, to all readers), under the diary content, labelled with the leader's name, with translation buttons. Other course leaders also see it.
 - Owners are not told which leaders have read their diary.
 - If a leader's account is deleted, their submitted comments remain, labelled as from a former leader; their unsubmitted comment drafts are deleted.
+
+### 5.5 Limits
+Limits stop a hijacked account (stolen session, malware) from flooding the app. The daily ones are set high enough that an honest user, even one catching up on a week's entries on a Saturday, never reaches them. The per-entry ones are deliberate, and are presented kindly.
+
+| Limit | Value | Notes |
+|---|---|---|
+| New entries created | 20 per user per day | |
+| First submissions (提交) | 20 per user per day | A SYS_ADMIN deleting an entry does not give its submission back |
+| Updates (更新) of submitted entries | 50 per user per day | A hidden backstop: stops a hijacked account pushing every real version out of the 3-version history |
+| Photos | 2 per entry | Applies to drafts and submissions. The image button is disabled after the second photo, with a short note. Encourages choosing the best photos |
+| Body length | 5,000 characters per entry | Visible text after sanitising, not HTML. Framed as care for the leader who reads it, e.g. "日記以精簡為佳，方便導師細讀" / "A focused entry is easier for your leader to read closely" (final wording reviewed by a native speaker). A counter appears from 80% |
+
+- "Day" is the Beijing calendar date; daily limits reset at midnight Beijing time.
+- **Nothing is ever lost at a limit.** A draft over 5,000 characters still saves; only 提交/更新 is blocked until it is shortened. When a daily limit is reached, the message says which limit and when it resets, and the text in the editor stays.
+- **No storage limit.** Storage is bounded by the daily limits and photo sizes. Each user sees their own usage (§4.4), and SYS_ADMINs see everyone's (§6.5).
+- Reaching any limit is recorded as an activity event and flags the account for SYS_ADMINs (§6.5).
+- The server enforces every limit; the client mirrors them so the user is warned before writing.
+
+### 5.6 Deleting entries
+- Users cannot delete their own entries (kept simple until asked for). Only a SYS_ADMIN deletes entries (§6.5), and deletion is immediate.
 
 ## 6. Pages & Behaviors
 
@@ -147,8 +171,14 @@ Owner or any COURSE_LEADER unchecks → state = 'Private'
 ### 6.5 SYS_ADMIN home (sequential sections)
 1. **User management** — list users; fuzzy search by username with `?` / `*`; add a user (username + password + role required, others optional; a generated password is shown once); edit everything except username, including role; delete a user (confirm) — deleting a user **deletes all their documents**; batch delete of normal users. The last SYS_ADMIN cannot be deleted or demoted.
 2. **Document management** — search by username and/or date, delete documents; only metadata is shown (title, date, owner, state) — never content or comments.
-3. **报数 admin list** — shows **all** users; per-row toggle of the user's auto-submit flag; per-row button to delete all of a user's count entries (confirm); status of the last auto-submit run, and a button to run it now.
+3. **报数 admin list** — shows **all** users; per-row toggle of the user's auto-submit flag; per-row button to delete a user's count entries, all of them or those in a count-date range (confirm); status of the last auto-submit run, and a button to run it now.
 4. **Pending password resets** — the `RESET_PENDING` list with the generate/manual password flow (§4.3).
+5. **Attention and activity** — for spotting a hijacked account. Everything here is **metadata only**; no diary content, comments or profile fields.
+   - **Activity log:** per user and time — entry created / submitted / updated, count entry, limit reached, login, failed login, new device, password changed. Kept 90 days. Never shown to the user it describes.
+   - **Activity summary:** per-user totals for today and the last 7 days (entries, submissions, updates, count entries, storage used), sortable, so spikes stand out.
+   - **Attention list** (badge with a count): accounts flagged by simple rules — reached any limit, a burst of failed logins, several new devices in a day. A SYS_ADMIN marks an item as handled.
+   - **Response actions:** sign the user out of all devices; lock the account (marks it `RESET_PENDING`, so it needs a new password from a SYS_ADMIN, §4.3); delete count entries by date range.
+   - **Alerts:** the Attention list in the app is always on and is the full record. When email is configured, each new flag is also emailed to every SYS_ADMIN's account email (at most one email per flagged user per hour, plus a daily summary), so the alert reaches their phone. Emails contain usernames and event types only. The screen shows whether email alerts are on.
 
 ### 6.6 SYS_ADMIN user-profile editor
 - Role, email (unique), family/given name, address, optional new password (shown once after save), photo upload/delete; delete-user button.
@@ -162,7 +192,7 @@ Owner or any COURSE_LEADER unchecks → state = 'Private'
                  <blue progress bar>
                  GOAL COUNT目標數: 10,000,000   |   xx.xx% completed (both in large type)
 REPORTED_TODAY今日報告: <today> (entries紀錄: <n>)
-今日报数 | <number box> | <manual submit> | <auto submit checkbox>
+今日报数 | <count date, default today> | <number box> | <manual submit> | <auto submit checkbox>
 <latest-20 entries table>
 ```
 - The total is the most prominent figure, with the goal and percentage in large type below the bar; there is no separate goal tile.
@@ -172,10 +202,13 @@ REPORTED_TODAY今日報告: <today> (entries紀錄: <n>)
 ### 7.2 Input rules
 - Daily count: digits only, invalid characters trimmed with a notice, value clamped to **1–1080** with a notice. The server enforces the same rules.
 - Manual submit → new entry + refresh all figures and the table; the value also becomes the user's saved default for auto-submit.
+- **Count date:** defaults to today; the user may pick any of the previous 5 days (Beijing time) to report a missed day. Never a future date.
+- **Limit:** at most **10 manual entries per user per count date** (the auto-submitted entry does not count toward it). The limit is per count date, not per submit day, so backdating cannot multiply it. Reaching it is recorded as an activity event (§6.5).
+- "Today's Count" and "First Count Date" use the count date; "Latest Submit Time" uses the submit time.
 - Auto-submit checkbox persists immediately (reverts on failure). The typed value is saved continuously (debounced) so the nightly job always uses the latest number.
 
 ### 7.3 Auto-submit job
-- **Every day at 02:00 Beijing time** the server automatically submits one entry for every user whose auto-submit is on and whose saved count is positive, using the current time as submit time.
+- **Every day at 02:00 Beijing time** the server automatically submits one entry for every user whose auto-submit is on and whose saved count is positive, using the current time as submit time and today as count date.
 - An in-process scheduler fires at that time; a protected internal endpoint (Bearer secret, mounted outside normal authentication, not reachable from the public internet) can trigger the same job for an external cron. A SYS_ADMIN can also trigger it manually. Each run is recorded, and a missed or failed run is visible to SYS_ADMINs.
 
 ### 7.4 Diary ↔ count navigation
@@ -227,13 +260,16 @@ Build this only if testing on the users' actual phones shows the installable web
 ## 11. Acceptance Checklist
 
 - [ ] Login: captcha (+/− only) verified; failure refreshes image; RESET_PENDING user blocked; SYS_ADMIN needs an authenticator code; mode radio (default 报数) routes correctly per role; "remember this device" keeps the user logged in and can be revoked.
-- [ ] Diary: create → draft (manual + 5-min auto) → submit (max 3 history versions) → cannot resubmit until changed; content never lost; large phone photos are downscaled automatically with a notice.
+- [ ] Diary: create → draft (manual + 5-min auto) → submit → button reads 更新 → update (max 3 history versions) → cannot update until changed; content never lost; large phone photos are downscaled automatically with a notice.
+- [ ] Limits: entry date is set by the server and cannot be changed; 20 creates, 20 first submissions and 50 updates per day; 2 photos and 5,000 characters per entry (drafts over the limit still save); every limit enforced by the server, with a clear message and no lost text.
+- [ ] Deleting: users have no delete action; only a SYS_ADMIN deletes entries. Storage used is shown on the account page.
 - [ ] Leaders: a never-submitted diary is invisible to course leaders; after submitting, leaders see the submitted version, not later drafts.
 - [ ] Sharing: user request → Wait for open → leader confirm → Open; open diary + submitted comments readable by another user; uncheck returns to Private; a normal user cannot set Open directly.
 - [ ] Comments: several leaders can comment on one diary; a draft is invisible to the user and other leaders; submitted comments are visible with the leader's name; no caret jump; translations render as plain text.
 - [ ] SYS_ADMIN: can search/add/edit/delete users and change roles, reset passwords, query/delete documents — but receives no plaintext content or comments from any endpoint; the last SYS_ADMIN cannot be removed.
 - [ ] COURSE_LEADER: sees today's submitted documents immediately after login; calendar/user navigation reaches the comment editor; can approve open requests.
 - [ ] Password change and admin reset both keep the user's old documents readable by the user.
-- [ ] 报数: clamped 1–1080 input (client and server); manual submit updates everything; auto-submit toggle persists; admin list shows all users with toggle + delete-entries + last-run status; auto job runs at 02:00 Beijing.
+- [ ] 报数: clamped 1–1080 input (client and server); count date today or up to 5 days back; at most 10 manual entries per count date; manual submit updates everything; auto-submit toggle persists; admin list shows all users with toggle + delete-entries (all or by date range) + last-run status; auto job runs at 02:00 Beijing.
+- [ ] Attention: reaching a limit, failed-login bursts and new-device bursts flag the account in the SYS_ADMIN Attention list; with email configured, SYS_ADMINs also get a throttled email; activity views and emails contain no content; sign-out-all and lock work.
 - [ ] Installable: the app can be added to the home screen on Android and iPhone, opens standalone, stays logged in, picks up new versions, and never caches diary content.
 - [ ] Seed data (test environments only): 2 SYS_ADMINs, 2 COURSE_LEADERs, several NORMAL_USERs with encrypted sample diaries (including one Open, two Wait for open, one never-submitted draft, one submitted diary with a later unsubmitted draft, and comments in draft and submitted state from different leaders).

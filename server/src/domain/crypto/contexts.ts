@@ -16,4 +16,5 @@ export const fieldAad = {
     `document:${documentId}:version:${versionNo}`,
   comment: (documentId: string, commentId: string) => `document:${documentId}:comment:${commentId}`,
   profile: (userId: string) => `profile:${userId}:fields`,
+  totpSecret: (userId: string) => `profile:${userId}:totp`,
 } as const;

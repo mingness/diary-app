@@ -6,6 +6,7 @@ import { createDatabase } from '../../src/db/client.js';
 import { runMigrations } from '../../src/db/migrate.js';
 import { loadConfig } from '../../src/config.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/database.js';
+import { testConfig } from '../helpers/app.js';
 
 const migrationsDir = loadConfig({
   DATABASE_URL: 'postgres://unused',
@@ -30,7 +31,7 @@ async function withUnreachableDatabase(
 ): Promise<void> {
   const unreachable = createDatabase('postgres://nobody:nothing@127.0.0.1:1/none');
   const app = await buildApp({
-    config: { logLevel: 'fatal', migrationsDir, apiDocs },
+    config: { ...testConfig(), logLevel: 'fatal', migrationsDir, apiDocs },
     database: unreachable,
   });
   try {
@@ -55,7 +56,7 @@ describe('server skeleton', () => {
   beforeAll(async () => {
     testDb = await createTestDatabase();
     app = await buildApp({
-      config: { logLevel: 'info', migrationsDir, apiDocs: true },
+      config: { ...testConfig(), logLevel: 'info', apiDocs: true },
       database: testDb.database,
       logStream: logs.stream,
     });
@@ -190,6 +191,12 @@ describe('server skeleton', () => {
       const spec = res.json();
       expect(spec.openapi).toMatch(/^3\./);
       expect(Object.keys(spec.paths)).toEqual(expect.arrayContaining(['/healthz', '/readyz']));
+      // The Authorize button: without it nothing that changes data can be tried from the explorer.
+      expect(spec.components.securitySchemes.csrf).toMatchObject({
+        type: 'apiKey',
+        in: 'header',
+        name: 'x-csrf-token',
+      });
     });
 
     // Enforces the AGENTS.md rule: a route without a response schema is incomplete.

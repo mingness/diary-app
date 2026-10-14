@@ -103,6 +103,18 @@ describe('loadConfig', () => {
     });
   });
 
+  describe('CAPTCHA_FIXED', () => {
+    it('is off unless asked for', () => {
+      expect(loadConfig(validEnv()).captchaFixed).toBe(false);
+      expect(loadConfig(validEnv({ CAPTCHA_FIXED: 'true' })).captchaFixed).toBe(true);
+    });
+
+    it('is refused in production, by name, so a predictable CAPTCHA never reaches real users', () => {
+      const err = configErrorFor(validEnv({ NODE_ENV: 'production', CAPTCHA_FIXED: 'true' }));
+      expect(err.invalidVariables).toEqual(['CAPTCHA_FIXED']);
+    });
+  });
+
   describe('API_DOCS', () => {
     it('defaults to on outside production and off in production', () => {
       expect(loadConfig(validEnv()).apiDocs).toBe(true);

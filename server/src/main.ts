@@ -23,6 +23,9 @@ async function main(): Promise<void> {
 
   const database = createDatabase(config.databaseUrl);
   const app = await buildApp({ config, database });
+  if (config.captchaFixed) {
+    app.log.warn('CAPTCHA_FIXED is on: every CAPTCHA answer is 3. Development only.');
+  }
 
   try {
     await runMigrations(database, config.migrationsDir);

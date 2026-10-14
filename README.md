@@ -7,9 +7,10 @@ daily-count (報數) activity. Diaries are encrypted at rest; account administra
 - How it's built: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), screens in [docs/FRONTEND.md](docs/FRONTEND.md)
 - Working on it: [AGENTS.md](AGENTS.md)
 
-**Status:** Phase A, slice 2 of 10 done (skeleton; core domain: encryption, permissions, sharing rules,
-報數 input and Beijing-time scheduling). The API serves health checks only so far; features arrive slice by
-slice (see the delivery plan in ARCHITECTURE.md §11).
+**Status:** Phase A, slice 3 of 10 done: skeleton; core domain (encryption, permissions, sharing rules,
+報數 input, Beijing-time scheduling); users and sign-in (CAPTCHA, sessions, authenticator codes,
+registration, forgot password, admin CLI, seed data). Features arrive slice by slice (see the delivery plan
+in ARCHITECTURE.md §11).
 
 ## Quick start
 
@@ -20,6 +21,7 @@ npm ci
 npm run dev:setup      # writes .env with throwaway development keys
 npm run db:up          # PostgreSQL on 127.0.0.1:55432
 npm run dev            # API on http://localhost:3000
+npm run seed -- --reset # sample users; every password is password123
 curl localhost:3000/readyz
 ```
 
@@ -35,5 +37,6 @@ npm run test:unit         # no database needed
 npm run test:integration  # needs `npm run db:up`
 npm run test:watch        # unit tests, re-run on save
 npm run test:coverage     # all tests plus a coverage report in coverage/
+npm run test:functional   # against the running stack (local only; see server/test/functional/README.md)
 npm run check             # everything CI runs before the Docker and secret-scan stages
 ```

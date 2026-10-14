@@ -24,6 +24,11 @@ export interface Config {
   readonly cronSecret: string;
   /** Serve the API explorer at /docs. Defaults to on outside production; staging turns it on explicitly. */
   readonly apiDocs: boolean;
+  /**
+   * Development and test only: every CAPTCHA asks "1 + 2 = ?" (answer 3), so people trying the API by hand and
+   * end-to-end tests can sign in. Refused in production.
+   */
+  readonly captchaFixed: boolean;
 }
 
 export class ConfigError extends Error {
@@ -60,6 +65,7 @@ const envSchema = z.object({
   SESSION_SECRET: z.string().regex(/^[0-9a-f]{64,}$/i),
   CRON_SECRET: z.string().min(32),
   API_DOCS: z.enum(['true', 'false']).optional(),
+  CAPTCHA_FIXED: z.enum(['true', 'false']).default('false'),
 });
 
 const defaultMigrationsDir = new URL('../../db/migrations', import.meta.url).pathname;
@@ -87,6 +93,8 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
     if (env.DIARY_KEYRING && env.DIARY_KEYRING === env.PROFILE_KEYRING) {
       invalid.add('PROFILE_KEYRING');
     }
+    // A predictable CAPTCHA must never reach real users.
+    if (env.CAPTCHA_FIXED === 'true') invalid.add('CAPTCHA_FIXED');
   }
 
   if (!parsed.success || invalid.size > 0 || !diaryKeyring || !profileKeyring) {
@@ -106,5 +114,6 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
     sessionSecret: Buffer.from(e.SESSION_SECRET, 'hex'),
     cronSecret: e.CRON_SECRET,
     apiDocs: e.API_DOCS === undefined ? e.NODE_ENV !== 'production' : e.API_DOCS === 'true',
+    captchaFixed: e.CAPTCHA_FIXED === 'true',
   };
 }

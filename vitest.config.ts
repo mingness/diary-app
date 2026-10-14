@@ -15,7 +15,8 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['server/src/**', 'shared/src/**'],
-      exclude: ['server/src/main.ts'],
+      // Process entry points and interactive prompts; the logic they call is tested directly.
+      exclude: ['server/src/main.ts', 'server/src/cli.ts'],
       reporter: ['text-summary', 'html', 'lcov'],
       reportsDirectory: `${root}coverage`,
     },
@@ -37,6 +38,20 @@ export default defineConfig({
           // Each file creates its own database, so files can run in parallel.
           testTimeout: 20_000,
           hookTimeout: 30_000,
+        },
+      },
+      {
+        // Against the running stack over real HTTP, with its real configuration (e.g. rate limits).
+        // Local only, not part of `npm test` or CI: see server/test/functional/README.md.
+        root,
+        resolve: { alias },
+        test: {
+          name: 'functional',
+          include: ['server/test/functional/**/*.test.ts'],
+          testTimeout: 60_000,
+          hookTimeout: 30_000,
+          // These share the server's in-memory limits, so run files one after another.
+          fileParallelism: false,
         },
       },
     ],

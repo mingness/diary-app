@@ -6,22 +6,26 @@ Keep this file up to date when commands, conventions or pitfalls change.
 
 ## Commands
 
-| Task                                                  | Command                                                                             |
-| ----------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Install                                               | `npm ci` (Node version in `.nvmrc`; `fnm use` / `nvm use`)                          |
-| First-time setup                                      | `npm run dev:setup` (writes `.env` with throwaway keys; never commit it)            |
-| Start the database                                    | `npm run db:up`                                                                     |
-| Run the API with reload                               | `npm run dev` (http://localhost:3000, needs the database)                           |
-| API explorer (try every endpoint in the browser)      | http://localhost:3000/docs (OpenAPI JSON at `/docs/json`)                           |
-| Run the whole stack in Docker                         | `docker compose up -d --wait --build`                                               |
-| Everything CI checks                                  | `npm run check`                                                                     |
-| Format / lint / types                                 | `npm run format`, `npm run lint`, `npm run typecheck`                               |
-| Unit tests (no database)                              | `npm run test:unit`                                                                 |
-| Integration tests                                     | `npm run test:integration` (needs `npm run db:up`; each file gets a fresh database) |
-| All tests / unit tests on save                        | `npm test`, `npm run test:watch`                                                    |
-| Coverage report (all tests; HTML in `coverage/`)      | `npm run test:coverage`                                                             |
-| New migration after editing `server/src/db/schema.ts` | `npm run db:generate -w server`, then review the SQL                                |
-| Stop the database                                     | `npm run db:down` (add `-v` to `docker compose down` to wipe data)                  |
+| Task                                                   | Command                                                                                                 |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| Install                                                | `npm ci` (Node version in `.nvmrc`; `fnm use` / `nvm use`)                                              |
+| First-time setup                                       | `npm run dev:setup` (writes `.env` with throwaway keys; never commit it)                                |
+| Start the database                                     | `npm run db:up`                                                                                         |
+| Run the API with reload                                | `npm run dev` (http://localhost:3000, needs the database)                                               |
+| API explorer (try every endpoint in the browser)       | http://localhost:3000/docs (OpenAPI JSON at `/docs/json`)                                               |
+| Run the whole stack in Docker                          | `docker compose up -d --wait --build`                                                                   |
+| Everything CI checks                                   | `npm run check`                                                                                         |
+| Format / lint / types                                  | `npm run format`, `npm run lint`, `npm run typecheck`                                                   |
+| Unit tests (no database)                               | `npm run test:unit`                                                                                     |
+| Integration tests                                      | `npm run test:integration` (needs `npm run db:up`; each file gets a fresh database)                     |
+| All tests / unit tests on save                         | `npm test`, `npm run test:watch`                                                                        |
+| Coverage report (all tests; HTML in `coverage/`)       | `npm run test:coverage`                                                                                 |
+| Functional tests (live stack, real config; local only) | `npm run test:functional` after `docker compose restart server`; see `server/test/functional/README.md` |
+| Sample users (dev only; wipes users)                   | `npm run seed -- --reset` (every password is `password123`; admins' authenticator keys are printed)     |
+| Current code for a seeded admin's authenticator key    | `npm run cli -w server -- totp-code <key>`                                                              |
+| First admin / recovery (production, in the container)  | `node server/dist/cli.js create-sysadmin <name>` · `set-password <name>` · `reset-totp <name>`          |
+| New migration after editing `server/src/db/schema.ts`  | `npm run db:generate -w server`, then review the SQL                                                    |
+| Stop the database                                      | `npm run db:down` (add `-v` to `docker compose down` to wipe data)                                      |
 
 ## Layout
 
@@ -37,6 +41,9 @@ Keep this file up to date when commands, conventions or pitfalls change.
 
 - **Plan first, small slices.** Follow the delivery plan in `docs/ARCHITECTURE.md` §11. Each slice ends with
   `npm run check` green and `docker compose up` working. Nothing half-built is reachable.
+- **Test layers:** unit (pure logic, no I/O), integration (the app on a fresh database, with a controllable
+  clock), functional (the running stack over real HTTP with its real configuration; for behaviour like per-IP
+  rate limits that only means something end to end; local only).
 - **Tests ship with the code.** A bug fix starts with a failing test. Integration tests cover every role,
   allowed and denied.
 - **What to test.** Unit tests pin exact input → output where the spec defines it (permission tables, 報數
@@ -49,6 +56,11 @@ Keep this file up to date when commands, conventions or pitfalls change.
   writing a destructive migration.
 - **Routes declare zod schemas** for params, body and every response (use `app.withTypeProvider<ZodTypeProvider>()`).
   That validates requests and feeds the API explorer; a route without a response schema is incomplete.
+- **Auth in routes:** guard with `requireAuth()` or `requireCapability(...)` from `server/src/plugins/auth.ts`,
+  and read the session with `authOf(request)`. Anything that changes data automatically needs the
+  `X-CSRF-Token` header. Never trust a role or user ID sent in a request body.
+- **Time and randomness** come from the context (`ctx.clock()`, `ctx.captchaQuestion()`), never `new Date()`
+  inside services, so tests can control them.
 - **Errors:** always `{code, message, requestId}`. Codes come from `ErrorCode` in `shared/`; the web app
   translates them. Never put stack traces or secrets in responses.
 - **Logging:** structured, via `request.log` / `app.log`. Never log passwords, tokens, keys, diary content,

@@ -14,6 +14,7 @@
     "db:up": "docker compose up -d --wait db",
     "db:down": "docker compose down",
     "dev": "npm run dev -w server",
+    "seed": "npm run seed -w server --",
     "build": "npm run build -w shared && npm run build -w server",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -23,7 +24,8 @@
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
     "test:watch": "vitest --project unit",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "vitest run --coverage --project unit --project integration",
+    "test:functional": "vitest run --project functional",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test"
   },
   "devDependencies": {

@@ -8,6 +8,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
+import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import {
@@ -16,26 +17,43 @@ import {
   validatorCompiler,
 } from 'fastify-type-provider-zod';
 import type { DestinationStream } from 'pino';
-import { ErrorCode, REQUEST_ID_HEADER, type ErrorBody } from '@diary/shared';
+import { CSRF_HEADER, ErrorCode, REQUEST_ID_HEADER, type ErrorBody } from '@diary/shared';
 import type { Config } from './config.js';
+import { createContext, type AppContext } from './context.js';
 import type { Database } from './db/client.js';
+import { FailureThrottle } from './domain/auth/throttle.js';
+import { rateLimited } from './http-errors.js';
 import { loggerOptions } from './logging.js';
+import { installAuth } from './plugins/auth.js';
+import { authRoutes, DEFAULT_AUTH_LIMITS, type AuthLimits } from './routes/auth.js';
 import { healthRoutes } from './routes/health.js';
+import { meRoutes } from './routes/me.js';
 
 /** Largest accepted request body: one 8 MB document plus headroom (docs/ARCHITECTURE.md §8.3). */
 export const BODY_LIMIT_BYTES = 10 * 1024 * 1024;
 
 export interface AppDeps {
-  config: Pick<Config, 'logLevel' | 'migrationsDir' | 'apiDocs'>;
+  config: Config;
   database: Database;
   /** Tests pass a stream to capture log lines; production logs to stdout. */
   logStream?: DestinationStream;
+  /** Tests pin the time and the CAPTCHA question; production uses the real clock and random questions. */
+  overrides?: Partial<Pick<AppContext, 'clock' | 'captchaQuestion'>>;
+  /** Per-IP limits on the auth endpoints; tests raise them so they can make many requests. */
+  authLimits?: Partial<AuthLimits>;
 }
 
 /** Path of the API explorer (dev and staging only; see `API_DOCS`). The OpenAPI JSON is at `${API_DOCS_PATH}/json`. */
 export const API_DOCS_PATH = '/docs';
 
-export async function buildApp({ config, database, logStream }: AppDeps): Promise<FastifyInstance> {
+export async function buildApp({
+  config,
+  database,
+  logStream,
+  overrides,
+  authLimits,
+}: AppDeps): Promise<FastifyInstance> {
+  const ctx = createContext(config, database.db, overrides);
   const logger = logStream
     ? { ...loggerOptions(config.logLevel), stream: logStream }
     : loggerOptions(config.logLevel);
@@ -59,9 +77,25 @@ export async function buildApp({ config, database, logStream }: AppDeps): Promis
           title: 'Cultivation Diary API',
           description:
             "Every endpoint, generated from the server's own request and response schemas. " +
-            'Errors always have the shape {code, message, requestId}.',
+            'Errors always have the shape {code, message, requestId}.\n\n' +
+            '**Signing in here:** run GET /api/auth/captcha, then POST /api/auth/login with its id. With ' +
+            'CAPTCHA_FIXED=true (the development default) the answer is always 3. The browser keeps the ' +
+            'session cookie for you. Then press Authorize and paste the csrfToken from the login response.',
           version: '0.0.0',
         },
+        components: {
+          securitySchemes: {
+            csrf: {
+              type: 'apiKey',
+              in: 'header',
+              name: CSRF_HEADER,
+              description:
+                'Paste the csrfToken from the login (or GET /api/me) response. Needed for every request ' +
+                'that changes something; the session itself travels in a cookie the browser sends for you.',
+            },
+          },
+        },
+        security: [{ csrf: [] }],
       },
       transform: jsonSchemaTransform,
     });
@@ -106,7 +140,20 @@ export async function buildApp({ config, database, logStream }: AppDeps): Promis
     return reply.code(status >= 400 ? status : 500).send(body);
   });
 
+  await app.register(rateLimit, { global: false, errorResponseBuilder: () => rateLimited() });
+  await installAuth(app, ctx);
+
   healthRoutes(app, { pool: database.pool, migrationsDir: config.migrationsDir });
+  authRoutes(
+    app,
+    ctx,
+    { ...DEFAULT_AUTH_LIMITS, ...authLimits },
+    {
+      password: new FailureThrottle({ maxFailures: 5, windowMs: 15 * 60 * 1000 }, ctx.clock),
+      totp: new FailureThrottle({ maxFailures: 5, windowMs: 15 * 60 * 1000 }, ctx.clock),
+    },
+  );
+  meRoutes(app, ctx);
 
   return app;
 }

@@ -22,6 +22,8 @@ const generated = {
   PROFILE_KEYRING: `v1:${hex(32)}`,
   SESSION_SECRET: hex(32),
   CRON_SECRET: hex(32),
+  // Convenient for trying the API by hand; set to false to see real CAPTCHAs.
+  CAPTCHA_FIXED: 'true',
 };
 
 const lines = readFileSync(template, 'utf8')

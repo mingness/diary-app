@@ -246,6 +246,7 @@ describe('record labels (contexts.ts)', () => {
     [fieldAad.documentVersion('D', 3), 'document:D:version:3'],
     [fieldAad.comment('D', 'C'), 'document:D:comment:C'],
     [fieldAad.profile('U'), 'profile:U:fields'],
+    [fieldAad.totpSecret('U'), 'profile:U:totp'],
   ])('%s', (actual, expected) => {
     expect(actual).toBe(expected);
   });

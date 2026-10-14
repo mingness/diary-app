@@ -17,6 +17,17 @@ export const ErrorCode = {
   InvalidTransition: 'invalid_transition',
   /** The entry has never been submitted, so it can't be shared or reviewed yet. */
   NotSubmitted: 'not_submitted',
+  /** Login failed. Deliberately the same for unknown user, wrong password and locked account. */
+  InvalidCredentials: 'invalid_credentials',
+  CaptchaFailed: 'captcha_failed',
+  UsernameTaken: 'username_taken',
+  EmailTaken: 'email_taken',
+  /** The session is waiting for an authenticator code, or must set one up first. */
+  TotpRequired: 'totp_required',
+  TotpInvalid: 'totp_invalid',
+  /** Missing or wrong X-CSRF-Token header on a request that changes something. */
+  CsrfFailed: 'csrf_failed',
+  RateLimited: 'rate_limited',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 
@@ -45,12 +56,13 @@ export type ReadyBody = z.infer<typeof ReadyBody>;
 /** Header carrying the request ID back to the client, for "error ref" in toasts. */
 export const REQUEST_ID_HEADER = 'x-request-id';
 
-/** Account roles. Each account has exactly one (docs/project_prompt.md §2). */
-export const Role = z.enum(['NORMAL_USER', 'COURSE_LEADER', 'SYS_ADMIN']);
-export type Role = z.infer<typeof Role>;
-
 /** Who can read a diary entry besides its owner and the course leaders (§5.3). */
 export const Access = z.enum(['private', 'wait_for_open', 'open']);
 export type Access = z.infer<typeof Access>;
 
+export * from './roles.js';
 export * from './count.js';
+export * from './auth.js';
+
+/** Header that must carry the session's CSRF token on every request that changes something. */
+export const CSRF_HEADER = 'x-csrf-token';

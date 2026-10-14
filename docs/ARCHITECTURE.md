@@ -113,9 +113,10 @@ other entries' IDs by counting.
 users
   id, username UNIQUE (immutable), email UNIQUE NULL
   role ENUM(NORMAL_USER, COURSE_LEADER, SYS_ADMIN)   -- one role per account
-  password_hash NULL                      -- argon2id; NULL while reset_pending
-  reset_pending BOOL                      -- §4.3 lock-out
-  totp_secret_ct NULL, totp_enabled_at NULL          -- required for SYS_ADMIN
+  password_hash                           -- argon2id PHC string (parameters inside, upgraded on login)
+  reset_pending BOOL                      -- §4.3 lock-out: login refused, old hash kept until an admin resets
+  totp_secret_ct/nonce NULL, totp_enabled_at NULL    -- secret encrypted with the profile DEK; required for SYS_ADMIN
+  totp_last_step NULL                     -- last accepted code's time step, so a code can't be replayed
   font_size SMALLINT DEFAULT 18, theme ENUM(light, dark, system) DEFAULT system
   profile_ct, profile_nonce, profile_dek_wrapped     -- {familyName, givenName, address, photo}
   created_at, updated_at
@@ -171,14 +172,15 @@ job_runs
 
 sessions
   id_hash (SHA-256 of the cookie value), user_id, kind ENUM(browser, device)
-  device_label NULL                       -- from the user agent at login ("iPhone · Safari"); no IP geolocation
-  csrf_token, created_at, last_seen_at, expires_at, revoked_at NULL
+  device_label                            -- from the user agent at login ("iPhone · Safari"); no IP geolocation
+  csrf_token, mfa ENUM(not_required, pending, enrolment_required, verified)
+  created_at, last_seen_at, expires_at, revoked_at NULL
 
 read_audit                                -- security log only; never shown to diary owners
   leader_id, document_id, read_at
 
 captchas
-  id, answer_hash, expires_at             -- single use
+  id, answer_hash (HMAC under SESSION_SECRET), expires_at   -- single use, 5 minutes
 ```
 
 Deleting a user deletes their documents (spec). Deleting a leader keeps their *submitted* comments, shown as
@@ -303,8 +305,17 @@ diaries. A leader's own entries are governed by the owner rows; the leader rows 
 - **CAPTCHA (§4.1):** server-rendered SVG whose glyphs are paths. The answer is never sent to the client and is
   stored hashed; each CAPTCHA is single-use and refreshes on failure.
 - **Rate limits:** per IP at the proxy, per username in the app.
-- **Forgot password (§4.3):** always answers "已經提交給管理員", so it doesn't reveal which usernames exist,
-  and is rate-limited. A SYS_ADMIN issues a password from an alphabet without look-alike characters using
+- **Forgot password (§4.3):** always answers "已經提交給管理員", so it doesn't reveal which usernames exist.
+  It needs the CAPTCHA and is rate-limited, because anyone can lock any account by name. SYS_ADMIN accounts
+  can't be locked from this public form (otherwise anyone could lock every admin out); a locked-out admin is
+  recovered by another admin or the CLI (`set-password`, `reset-totp`).
+- **Accounts:** usernames are 3–32 characters (letters, digits, `.` `_` `-`), unique ignoring case; passwords
+  8–256 characters. Failed logins answer the same and take the same time for unknown users, wrong passwords
+  and locked accounts. Five failures for a username within 15 minutes block it for the rest of the window;
+  the same applies to wrong authenticator codes, which also end the half-open session. These counters, and
+  the per-IP limits, live in memory: right for the single server instance we plan to run. Moving them to the
+  database is not scheduled; it becomes necessary only if we ever run several instances behind a load
+  balancer. A SYS_ADMIN issues a password from an alphabet without look-alike characters using
   `crypto.randomInt`. It is shown once, and all of the user's sessions are revoked.
 - **Sessions:** an HttpOnly, Secure, SameSite=Lax cookie holds a random token; the DB stores only its hash.
   Plus a CSRF header.
@@ -312,6 +323,9 @@ diaries. A leader's own entries are governed by the owner rows; the leader rows 
   - **"Remember this device"**, the device token: 90-day sliding expiry. It's listed under Account → Devices
     and can be revoked there.
   - Leaders and SYS_ADMINs: device sessions capped at 30 days.
+  - Waiting for an authenticator code: 5 minutes.
+  - Production uses the `__Host-sid` cookie name, which browsers only accept with Secure, path=/ and no domain.
+  - Signing in replaces any session the browser already had (prevents session fixation).
 - **TOTP:** required for SYS_ADMIN, enrolled on first login (or through the CLI for the first admin); optional
   for others. Recovery is another SYS_ADMIN resetting it, or the CLI for the last admin.
   - Password changes and resets revoke all the user's sessions except the current one.
@@ -501,7 +515,10 @@ states. Each slice is one screen group, with Playwright e2e tests at 360 px and 
 ### Phase C: production
 
 18. **Ops:** deploy to Hong Kong with TLS, backup/restore, key rotation, RUNBOOK, SECURITY.md, PRIVACY.md,
-    release pipeline. (A staging deploy can come earlier, as soon as slice 3 is done, to exercise the pipeline.)
+    release pipeline. Includes two rate-limit tasks that only matter once there is a reverse proxy:
+    - Tell the server to trust the proxy's `X-Forwarded-For` (and nothing else), otherwise every visitor
+      appears to come from the proxy's address and shares one per-IP limit.
+    - Add coarse per-IP limits at the proxy as a first line of defence. (A staging deploy can come earlier, as soon as slice 3 is done, to exercise the pipeline.)
 
 Each slice ships with tests, both languages where it has UI, permission tests per role, and doc updates (§12.10).
 

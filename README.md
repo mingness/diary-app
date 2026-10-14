@@ -7,10 +7,10 @@ daily-count (報數) activity. Diaries are encrypted at rest; account administra
 - How it's built: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), screens in [docs/FRONTEND.md](docs/FRONTEND.md)
 - Working on it: [AGENTS.md](AGENTS.md)
 
-**Status:** Phase A, slice 4 of 10 done: skeleton; core domain (encryption, permissions, sharing rules,
-報數 input, Beijing-time scheduling); users and sign-in (CAPTCHA, sessions, authenticator codes,
-registration, forgot password, admin CLI, seed data); SYS_ADMIN user management, activity log, Attention
-list and optional email alerts. Features arrive slice by slice (see the delivery plan in ARCHITECTURE.md §11).
+**Status:** Phase A, slice 5 of 10 done: skeleton; core domain; users and sign-in; SYS_ADMIN user management,
+activity log, Attention list and optional email alerts; the diary (encrypted entries, drafts, 提交/更新 with
+history, limits, sanitising) and SYS_ADMIN document management. Features arrive slice by slice (see the
+delivery plan in ARCHITECTURE.md §11).
 
 ## Quick start
 

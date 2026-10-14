@@ -3,12 +3,11 @@
  * SYS_ADMIN, recovering a locked-out admin, and seeding development data. Kept apart from the CLI's prompts so
  * it can be tested directly.
  */
-import { eq, sql } from 'drizzle-orm';
-import type { Profile, Role } from '@diary/shared';
+import { eq } from 'drizzle-orm';
 import type { AppContext } from '../context.js';
 import { users } from '../db/schema.js';
 import { hashPassword } from '../domain/auth/passwords.js';
-import { checkTotp, generateTotpSecret } from '../domain/auth/totp.js';
+import { checkTotp } from '../domain/auth/totp.js';
 import { EMPTY_PROFILE, sealTotpSecret } from './profiles.js';
 import { revokeUserSessions } from './sessions.js';
 import { createUser, findUserByUsername, type UserRow } from './users.js';
@@ -20,8 +19,13 @@ export class AdminToolError extends Error {
   }
 }
 
-/** Turns on TOTP for a user with an already-verified secret. */
-async function enableTotp(ctx: AppContext, user: UserRow, secret: string, step: number | null) {
+/** Turns on TOTP for a user with an already-verified secret (also used by the development seed). */
+export async function enableTotp(
+  ctx: AppContext,
+  user: UserRow,
+  secret: string,
+  step: number | null,
+) {
   const sealed = sealTotpSecret(ctx.config.profileKeyring, user.id, user.profileDekWrapped, secret);
   const now = ctx.clock();
   await ctx.db
@@ -87,85 +91,4 @@ export async function setPassword(
     })
     .where(eq(users.id, user.id));
   await revokeUserSessions(ctx, user.id);
-}
-
-// ---------------------------------------------------------------------------------------------------------
-// Development seed (spec §11). Never runs in production; passwords and secrets are throwaway.
-
-export const SEED_PASSWORD = 'password123';
-
-interface SeedUser {
-  readonly username: string;
-  readonly role: Role;
-  readonly profile: Profile;
-  readonly resetPending?: boolean;
-}
-
-const person = (familyName: string, givenName: string, address = ''): Profile => ({
-  familyName,
-  givenName,
-  address,
-  photo: null,
-});
-
-export const SEED_USERS: readonly SeedUser[] = [
-  { username: 'admin', role: 'SYS_ADMIN', profile: person('李', '志強') },
-  { username: 'admin2', role: 'SYS_ADMIN', profile: person('陳', '志強') },
-  { username: 'leader.lin', role: 'COURSE_LEADER', profile: person('林', '慧君') },
-  { username: 'leader.huang', role: 'COURSE_LEADER', profile: person('黃', '志遠') },
-  { username: 'chenmd', role: 'NORMAL_USER', profile: person('陳', '明德', '[地址 1]') },
-  { username: 'zhangsf', role: 'NORMAL_USER', profile: person('張', '淑芬', '[地址 2]') },
-  { username: 'wangdt', role: 'NORMAL_USER', profile: person('王', '大同') },
-  { username: 'wuml', role: 'NORMAL_USER', profile: person('吳', '美玲') },
-  { username: 'linjy', role: 'NORMAL_USER', profile: person('林', '佳穎') },
-  { username: 'lijg', role: 'NORMAL_USER', profile: person('李', '建國') },
-  { username: 'chenmh', role: 'NORMAL_USER', profile: person('陳', '美華'), resetPending: true },
-];
-
-export interface SeedResult {
-  readonly users: { username: string; role: Role; totpSecret?: string; resetPending: boolean }[];
-}
-
-/**
- * Loads the development users. Refuses in production, and refuses to touch a database that already has users
- * unless `reset` is set (which deletes everything first).
- */
-export async function seed(ctx: AppContext, options: { reset: boolean }): Promise<SeedResult> {
-  if (ctx.config.env === 'production') {
-    throw new AdminToolError('Refusing to seed a production database.');
-  }
-  const [{ count } = { count: 0 }] = await ctx.db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(users);
-  if (count > 0 && !options.reset) {
-    throw new AdminToolError(
-      'The database already has users. Run with --reset to wipe and re-seed.',
-    );
-  }
-  if (options.reset) await ctx.db.delete(users);
-
-  const result: SeedResult['users'] = [];
-  for (const spec of SEED_USERS) {
-    const user = await createUser(ctx, {
-      username: spec.username,
-      password: SEED_PASSWORD,
-      role: spec.role,
-      profile: spec.profile,
-    });
-    let totpSecret: string | undefined;
-    if (spec.role === 'SYS_ADMIN') {
-      totpSecret = generateTotpSecret();
-      await enableTotp(ctx, user, totpSecret, null);
-    }
-    if (spec.resetPending) {
-      await ctx.db.update(users).set({ resetPending: true }).where(eq(users.id, user.id));
-    }
-    result.push({
-      username: spec.username,
-      role: spec.role,
-      resetPending: spec.resetPending ?? false,
-      ...(totpSecret ? { totpSecret } : {}),
-    });
-  }
-  return { users: result };
 }

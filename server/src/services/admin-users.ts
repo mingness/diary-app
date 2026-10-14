@@ -9,7 +9,7 @@ import { and, asc, count, eq, inArray, ne, sql, type SQL } from 'drizzle-orm';
 import { ErrorCode, type AdminUser, type Profile, type Role } from '@diary/shared';
 import type { AppContext } from '../context.js';
 import type { Db } from '../db/client.js';
-import { users } from '../db/schema.js';
+import { comments, users } from '../db/schema.js';
 import { usernamePatternToLike } from '../domain/admin/search.js';
 import { generatePassword, hashPassword } from '../domain/auth/passwords.js';
 import { HttpError } from '../http-errors.js';
@@ -246,6 +246,8 @@ export async function adminDeleteUser(ctx: AppContext, actorId: string, id: stri
       .for('update');
     if (!target) throw notFound();
     if (target.role === 'SYS_ADMIN' && adminCount <= 1) throw lastAdmin();
+    // A deleted leader's submitted comments stay, shown as from a former leader; their drafts go (spec §5.4).
+    await tx.delete(comments).where(and(eq(comments.authorId, id), eq(comments.state, 'draft')));
     await tx.delete(users).where(eq(users.id, id));
   });
 }

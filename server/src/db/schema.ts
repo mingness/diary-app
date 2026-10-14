@@ -9,12 +9,14 @@ import { sql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  date,
   customType,
   index,
   integer,
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   smallint,
   text,
   timestamp,
@@ -196,4 +198,121 @@ export const jobRuns = pgTable(
     error: text('error'),
   },
   (t) => [index('job_runs_job_time_idx').on(t.job, t.startedAt)],
+);
+
+// ---------------------------------------------------------------------------------------------------------
+// Diary entries (spec §5, docs/ARCHITECTURE.md §5). Content, drafts, versions and comments are encrypted with
+// the entry's own DEK, which is wrapped by DIARY_KEYRING. Only server/src/services/diary/ handles them.
+
+export const accessEnum = pgEnum('access', ['private', 'wait_for_open', 'open']);
+
+export const documents = pgTable(
+  'documents',
+  {
+    id: uuid('id').primaryKey(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** The submitted title (plaintext, spec §3); before the first submit, the working title. */
+    title: text('title').notNull(),
+    /** A pending title change that leaders don't see yet; null when nothing is pending. */
+    draftTitle: text('draft_title'),
+    /** The Beijing date of creation, set by the server (spec §5.1, D22). */
+    diaryDate: date('diary_date', { mode: 'string' }).notNull(),
+    /** What leaders see: the last submitted body. */
+    contentCt: bytea('content_ct'),
+    contentNonce: bytea('content_nonce'),
+    /** The owner's pending body; null when nothing is pending. */
+    draftCt: bytea('draft_ct'),
+    draftNonce: bytea('draft_nonce'),
+    draftSavedAt: timestamptz('draft_saved_at'),
+    firstSubmittedAt: timestamptz('first_submitted_at'),
+    lastSubmittedAt: timestamptz('last_submitted_at'),
+    access: accessEnum('access').notNull().default('private'),
+    accessDecidedBy: uuid('access_decided_by').references(() => users.id, { onDelete: 'set null' }),
+    accessDecidedAt: timestamptz('access_decided_at'),
+    dekWrapped: bytea('dek_wrapped').notNull(),
+    /** Copy of the wrapped key's version, so key rotation can find old ones with an index. */
+    keyVersion: integer('key_version').notNull(),
+    createdAt: timestamptz('created_at').notNull(),
+    updatedAt: timestamptz('updated_at').notNull(),
+  },
+  (t) => [
+    index('documents_owner_date_idx').on(t.ownerId, t.diaryDate),
+    index('documents_submitted_date_idx')
+      .on(t.diaryDate)
+      .where(sql`${t.firstSubmittedAt} IS NOT NULL`),
+    index('documents_access_idx').on(t.access),
+    index('documents_key_version_idx').on(t.keyVersion),
+    check('documents_content_pair', sql`(${t.contentCt} IS NULL) = (${t.contentNonce} IS NULL)`),
+    check('documents_draft_pair', sql`(${t.draftCt} IS NULL) = (${t.draftNonce} IS NULL)`),
+    check(
+      'documents_submitted_has_content',
+      sql`(${t.firstSubmittedAt} IS NULL) = (${t.contentCt} IS NULL)`,
+    ),
+    check(
+      'documents_only_submitted_shared',
+      sql`${t.access} = 'private' OR ${t.firstSubmittedAt} IS NOT NULL`,
+    ),
+  ],
+);
+
+export const documentVersions = pgTable(
+  'document_versions',
+  {
+    id: uuid('id').primaryKey(),
+    documentId: uuid('document_id')
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+    versionNo: integer('version_no').notNull(),
+    contentCt: bytea('content_ct').notNull(),
+    contentNonce: bytea('content_nonce').notNull(),
+    createdAt: timestamptz('created_at').notNull(),
+  },
+  (t) => [uniqueIndex('document_versions_doc_no_key').on(t.documentId, t.versionNo)],
+);
+
+export const commentStateEnum = pgEnum('comment_state', ['draft', 'submitted']);
+
+/** One per leader per entry (spec §3). The comment API arrives in delivery slice 6. */
+export const comments = pgTable(
+  'comments',
+  {
+    id: uuid('id').primaryKey(),
+    documentId: uuid('document_id')
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+    /** Null once the leader's account is deleted: the comment then shows as from a former leader. */
+    authorId: uuid('author_id').references(() => users.id, { onDelete: 'set null' }),
+    bodyCt: bytea('body_ct').notNull(),
+    bodyNonce: bytea('body_nonce').notNull(),
+    state: commentStateEnum('state').notNull(),
+    submittedAt: timestamptz('submitted_at'),
+    seenByOwnerAt: timestamptz('seen_by_owner_at'),
+    createdAt: timestamptz('created_at').notNull(),
+    updatedAt: timestamptz('updated_at').notNull(),
+  },
+  (t) => [
+    uniqueIndex('comments_doc_author_key').on(t.documentId, t.authorId),
+    index('comments_document_idx').on(t.documentId),
+  ],
+);
+
+export const usageKindEnum = pgEnum('usage_kind', ['create', 'submit', 'update']);
+
+/**
+ * Counters for the daily limits (D21). Kept apart from the entries so deleting an entry refunds nothing.
+ * Incremented in the same transaction as the write it counts.
+ */
+export const dailyUsage = pgTable(
+  'daily_usage',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    day: date('day', { mode: 'string' }).notNull(),
+    kind: usageKindEnum('kind').notNull(),
+    n: integer('n').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.day, t.kind] })],
 );

@@ -123,10 +123,15 @@ users
 
 documents
   id, owner_id FK CASCADE
-  title (plaintext, §3), diary_date DATE   -- set by the server from created_at (Asia/Shanghai); never from the client
+  title (plaintext, §3)                   -- the submitted title (before the first submit, the working title)
+  draft_title NULL                        -- a pending title change leaders don't see until 更新
+  diary_date DATE                         -- set by the server from created_at (Asia/Shanghai); never from the client
   content_ct, content_nonce               -- last *submitted* content; leaders see only this
   draft_ct, draft_nonce, draft_saved_at   -- owner only, never shown to leaders
   first_submitted_at NULL                 -- NULL = never submitted = invisible to leaders
+  last_submitted_at NULL
+  CHECKs: ciphertext/nonce pairs set together; content exists iff first_submitted_at is set; only submitted
+  entries can be anything but private
   access ENUM(private, wait_for_open, open)
   access_decided_by FK users NULL, access_decided_at NULL
   dek_wrapped, key_version
@@ -352,8 +357,12 @@ diaries. A leader's own entries are governed by the owner rows; the leader rows 
 - **Limits (D21):** the values live in `shared/src/limits.ts`, so the editor's counter and the server agree.
   - Daily, per user, per Asia/Shanghai date: 20 creates, 20 first submissions, 50 updates, tracked in
     `daily_usage` within the write's transaction.
-  - Per entry: 2 images; 5,000 characters of visible body text after sanitising. A draft over 5,000 characters
-    still saves; only submit/update is refused, so text is never lost.
+  - Per entry: 2 images; 5,000 characters of visible body text after sanitising, **whitespace not counted**
+    (`visibleCharCount` in `shared/src/limits.ts`; the editor and the server then agree exactly however each
+    represents paragraph breaks). A draft over 5,000 characters still saves; only submit/update is refused, so
+    text is never lost.
+  - Submitting exactly what is already submitted (same title and body) changes nothing and counts nothing, so
+    a double click is harmless.
   - A refused write returns `LIMIT_REACHED` with `{limit, resetsAt}` (409), records a `limit_reached` activity
     event and raises an alert.
   - No storage quota. `storageBytes` is the sum of the user's ciphertext sizes (content, draft, versions,
@@ -504,9 +513,11 @@ its entries in the API explorer (D20), so it can be checked by hand before any s
    advisory locks, retention) and the email sender (optional SMTP). *(Done; step 3's activity events for
    logins, failed logins and new devices were added here.)*
 5. **Diary API:** create, draft, submit and update, history cap, sanitising, size caps, server-set entry date,
-   daily and per-entry limits (recording `limit_reached` and the entry activity events), storage usage
-   extended to entries, seed entries in every state. Then SYS_ADMIN document metadata and deletes, and the
-   "no plaintext for SYS_ADMIN" test, which moved here from step 4 because it needs real encrypted entries.
+   daily and per-entry limits, storage usage extended to entries, seed entries in every state; SYS_ADMIN
+   document metadata and deletes, and the "no plaintext for SYS_ADMIN" test (it discovers every GET endpoint
+   from the OpenAPI document). *(Done. The comments table exists already, so list counts are real; the
+   comment API arrives in slice 6. Until slices 6–7 add the leader and reader views, an entry answers 404 to
+   anyone but its owner.)*
 6. **Leader API:** lists, calendar counts, comments, open approvals, read audit.
 7. **Open diaries and sharing API.**
 8. **Account API:** profile, password change, devices, preferences.

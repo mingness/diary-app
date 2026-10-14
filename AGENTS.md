@@ -21,7 +21,7 @@ Keep this file up to date when commands, conventions or pitfalls change.
 | All tests / unit tests on save                         | `npm test`, `npm run test:watch`                                                                        |
 | Coverage report (all tests; HTML in `coverage/`)       | `npm run test:coverage`                                                                                 |
 | Functional tests (live stack, real config; local only) | `npm run test:functional` after `docker compose restart server`; see `server/test/functional/README.md` |
-| Sample users (dev only; wipes users)                   | `npm run seed -- --reset` (every password is `password123`; admins' authenticator keys are printed)     |
+| Sample users and entries (dev; wipes)                  | `npm run seed -- --reset` (every password is `password123`; admins' authenticator keys are printed)     |
 | Current code for a seeded admin's authenticator key    | `npm run cli -w server -- totp-code <key>`                                                              |
 | First admin / recovery (production, in the container)  | `node server/dist/cli.js create-sysadmin <name>` · `set-password <name>` · `reset-totp <name>`          |
 | New migration after editing `server/src/db/schema.ts`  | `npm run db:generate -w server`, then review the SQL                                                    |
@@ -67,6 +67,9 @@ Keep this file up to date when commands, conventions or pitfalls change.
   translates them. Never put stack traces or secrets in responses.
 - **Logging:** structured, via `request.log` / `app.log`. Never log passwords, tokens, keys, diary content,
   comments or profile fields; the redaction list in `server/src/logging.ts` is a backstop, not permission.
+- **Diary content** is only handled in `server/src/services/diary/`: bodies go through `inspectBody` (sanitise +
+  measure) before anything else, are sealed with the entry's DEK and the matching `fieldAad` label, and are
+  never logged. Limit values come from `shared/src/limits.ts`.
 - **The diary keyring** is only for `server/src/services/diary/`; lint enforces it (tested in
   `server/test/unit/lint-rules.test.ts`). Never work around the rule.
 - **Activity events:** record them with `recordActivity`/`recordLogin` wrapped in `safely(...)` so a logging

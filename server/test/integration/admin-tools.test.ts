@@ -7,11 +7,9 @@ import {
   AdminToolError,
   createSysadmin,
   resetTotp,
-  seed,
-  SEED_PASSWORD,
-  SEED_USERS,
   setPassword,
 } from '../../src/services/admin-tools.js';
+import { seed, SEED_PASSWORD, SEED_USERS } from '../../src/services/seed.js';
 import { createContext } from '../../src/context.js';
 import { findUserByUsername } from '../../src/services/users.js';
 import {
@@ -124,5 +122,44 @@ describe('seed', () => {
     );
     expect((await login(t.app, 'chenmh', SEED_PASSWORD)).res.statusCode).toBe(401);
     expect((await login(t.app, 'admin', SEED_PASSWORD)).res.json().status).toBe('totp_required');
+  });
+});
+
+describe('seed entries (spec §11)', () => {
+  it('include every state the acceptance checklist asks for, encrypted like real entries', async () => {
+    const { rows } = await t.testDb.database.pool.query<{
+      state: string;
+      access: string;
+      n: number;
+    }>(`
+      SELECT CASE WHEN first_submitted_at IS NULL THEN 'draft'
+                  WHEN draft_ct IS NOT NULL THEN 'submitted_with_draft'
+                  ELSE 'submitted' END AS state,
+             access::text AS access, count(*)::int AS n
+        FROM documents GROUP BY 1, 2`);
+    const count = (state: string | null, access: string | null) =>
+      rows
+        .filter(
+          (r) => (state === null || r.state === state) && (access === null || r.access === access),
+        )
+        .reduce((sum, r) => sum + r.n, 0);
+    expect(count(null, 'open')).toBe(1);
+    expect(count(null, 'wait_for_open')).toBe(2);
+    expect(count('draft', null)).toBeGreaterThanOrEqual(1);
+    expect(count('submitted_with_draft', null)).toBeGreaterThanOrEqual(1);
+    const { rows: versions } = await t.testDb.database.pool.query<{ n: number }>(
+      'SELECT count(*)::int AS n FROM document_versions',
+    );
+    expect(versions[0]!.n).toBeGreaterThanOrEqual(2);
+    // Leaders may keep a diary too (D19).
+    const { rows: leaderEntries } = await t.testDb.database.pool.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM documents d JOIN users u ON u.id = d.owner_id WHERE u.role = 'COURSE_LEADER'`,
+    );
+    expect(leaderEntries[0]!.n).toBeGreaterThanOrEqual(1);
+    const { rows: dump } = await t.testDb.database.pool.query<{ text: string }>(
+      "SELECT string_agg(row_to_json(d)::text, '') AS text FROM documents d",
+    );
+    // Titles are plaintext by design (spec §3); bodies never are. 計數器 appears only in a seeded body.
+    expect(dump[0]!.text).not.toContain('計數器');
   });
 });

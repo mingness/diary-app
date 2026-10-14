@@ -9,6 +9,8 @@ export class HttpError extends Error {
     readonly statusCode: number,
     readonly code: string,
     message: string,
+    /** Extra facts for the client, e.g. {limit, resetsAt}; never secrets or content. */
+    readonly details?: Record<string, string | number>,
   ) {
     super(message);
     this.name = 'HttpError';

@@ -32,6 +32,10 @@ export const ErrorCode = {
   LastAdmin: 'last_admin',
   /** An admin action that can't be applied to one's own account (e.g. deleting it). */
   SelfAction: 'self_action',
+  /** A usage limit (spec §5.5); `details` says which and, for daily limits, when it resets. */
+  LimitReached: 'limit_reached',
+  /** An embedded image is too large, or the entry body is (ARCHITECTURE §8.3). */
+  TooLarge: 'too_large',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 
@@ -40,6 +44,8 @@ export const ErrorBody = z.object({
   code: z.string(),
   message: z.string(),
   requestId: z.string(),
+  /** Extra facts for some codes, e.g. limit_reached: {limit, resetsAt}. */
+  details: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
 });
 export type ErrorBody = z.infer<typeof ErrorBody>;
 
@@ -60,15 +66,13 @@ export type ReadyBody = z.infer<typeof ReadyBody>;
 /** Header carrying the request ID back to the client, for "error ref" in toasts. */
 export const REQUEST_ID_HEADER = 'x-request-id';
 
-/** Who can read a diary entry besides its owner and the course leaders (§5.3). */
-export const Access = z.enum(['private', 'wait_for_open', 'open']);
-export type Access = z.infer<typeof Access>;
-
 export * from './roles.js';
 export * from './count.js';
 export * from './auth.js';
 export * from './admin.js';
 export * from './activity.js';
+export * from './limits.js';
+export * from './diary.js';
 
 /** Header that must carry the session's CSRF token on every request that changes something. */
 export const CSRF_HEADER = 'x-csrf-token';

@@ -22,12 +22,14 @@ import type { Config } from './config.js';
 import { createContext, type AppContext } from './context.js';
 import type { Database } from './db/client.js';
 import { FailureThrottle } from './domain/auth/throttle.js';
-import { rateLimited } from './http-errors.js';
+import { HttpError, rateLimited } from './http-errors.js';
 import { loggerOptions } from './logging.js';
 import { installAuth } from './plugins/auth.js';
 import { adminActivityRoutes } from './routes/admin-activity.js';
+import { adminDocumentRoutes } from './routes/admin-documents.js';
 import { adminUserRoutes } from './routes/admin-users.js';
 import { authRoutes, DEFAULT_AUTH_LIMITS, type AuthLimits } from './routes/auth.js';
+import { documentRoutes } from './routes/documents.js';
 import { healthRoutes } from './routes/health.js';
 import { meRoutes } from './routes/me.js';
 
@@ -134,6 +136,7 @@ export async function buildApp({
       };
     } else if (status < 500) {
       body = { code: error.code ?? 'bad_request', message: error.message, requestId: request.id };
+      if (error instanceof HttpError && error.details) body.details = error.details;
     } else {
       // Stack traces go to the log only, never to the client.
       request.log.error({ err: error }, 'unhandled error');
@@ -158,6 +161,8 @@ export async function buildApp({
   meRoutes(app, ctx);
   adminUserRoutes(app, ctx);
   adminActivityRoutes(app, ctx);
+  adminDocumentRoutes(app, ctx);
+  documentRoutes(app, ctx);
 
   return app;
 }

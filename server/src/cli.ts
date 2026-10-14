@@ -15,14 +15,8 @@ import { createDatabase } from './db/client.js';
 import { runMigrations } from './db/migrate.js';
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from './domain/auth/passwords.js';
 import { generateTotpSecret, totpUri } from './domain/auth/totp.js';
-import {
-  AdminToolError,
-  createSysadmin,
-  resetTotp,
-  seed,
-  SEED_PASSWORD,
-  setPassword,
-} from './services/admin-tools.js';
+import { AdminToolError, createSysadmin, resetTotp, setPassword } from './services/admin-tools.js';
+import { seed, SEED_PASSWORD } from './services/seed.js';
 
 const say = (line = '') => process.stdout.write(`${line}\n`);
 
@@ -127,7 +121,9 @@ async function main(argv: string[]): Promise<void> {
       case 'seed': {
         const reset = [arg, ...flags].includes('--reset');
         const result = await seed(ctx, { reset });
-        say(`Seeded ${result.users.length} users. Every password is: ${SEED_PASSWORD}\n`);
+        say(
+          `Seeded ${result.users.length} users and ${result.entries} diary entries. Every password is: ${SEED_PASSWORD}\n`,
+        );
         for (const u of result.users) {
           const extra = u.totpSecret ? `  authenticator key: ${u.totpSecret}` : '';
           const locked = u.resetPending ? '  (locked: waiting for password reset)' : '';

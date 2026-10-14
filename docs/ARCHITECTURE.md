@@ -1,10 +1,10 @@
-# 日记 (Diary) — Architecture
+# 修行日記 (Cultivation Diary) — Architecture
 
 > Status: **draft for review**, derived from `docs/project_prompt.md` (§1–11, *what*) and
 > `docs/project_prompt_engineering.md` (§12, *how*), both revised 2026-10-14 to match the decisions below.
-> Nothing is implemented yet. **The frontend is designed first** (`docs/FRONTEND.md`, to come); the API and data
-> model below are provisional until that design settles what the screens need.
-> Items marked **DECISION** need sign-off; each agreed decision becomes an ADR in `docs/decisions/`.
+> The screens are designed in `docs/FRONTEND.md` (decisions F1–F6 agreed); §5 and §7 below include what those
+> screens need. Implementation follows the delivery plan in §11: backend first, then the frontend.
+> Open items are marked in §12; each agreed decision becomes an ADR in `docs/decisions/`.
 
 ## 1. Goals and non-goals
 
@@ -31,7 +31,7 @@
 | DEK wrapped with a password-derived key *and* the SUPER_ADMIN key | **Option A (§6):** random DEK per document, wrapped by server-held keys only. Passwords are for login only. |
 | Android WebView app with APK self-update | **Installable web app**; the Android wrapper is a fallback (D10). |
 | 200+ seeded users, admins "system-generated" | Test environment only. Production starts empty, and the first SYS_ADMIN is created with a CLI command. |
-| Title 日记 | **修行日記** |
+| Title 日记 | **修行日記** (English: Cultivation Diary) |
 
 ## 2. Stack (D1, agreed)
 
@@ -47,8 +47,11 @@
 | Password hash | **argon2id** (`@node-rs/argon2`) | §12.4 |
 | HTML sanitising | **sanitize-html** on the server (editor tags only) | Stored-XSS defence for shared entries |
 | Web | **React 18 + Vite**, react-router | Static build |
+| Server state (web) | **TanStack Query** (F4, agreed) | Polling that pauses, retries, cache invalidation after writes; see FRONTEND.md §10 |
+| Rich text (web) | **Tiptap** on ProseMirror (F4, agreed) | Replaces deprecated `execCommand`; its schema mirrors the server's sanitiser allowlist |
 | PWA | **vite-plugin-pwa** (Workbox) | Manifest, service worker and update prompt |
-| Tests | **Vitest**, **Testcontainers** (Postgres), **Playwright** | §12.5; injectable clock and RNG |
+| Tests | **Vitest**, **Playwright**; Postgres from `docker compose` locally and a service container in CI | §12.5; each test file gets its own fresh database; injectable clock and RNG |
+| API explorer | **OpenAPI** generated from the zod route schemas, shown with **Swagger UI** (dev and staging only) | The "dashboard" for checking the API by hand before there is a frontend. **Pending approval** (§12, D20) |
 | Lint/format | ESLint + Prettier, **lefthook** pre-commit, **gitleaks** | §12.3, §12.9 |
 
 Any runtime dependency not listed here needs approval (§12.1).
@@ -102,7 +105,7 @@ users
   password_hash NULL                      -- argon2id; NULL while reset_pending
   reset_pending BOOL                      -- §4.3 lock-out
   totp_secret_ct NULL, totp_enabled_at NULL          -- required for SYS_ADMIN
-  font_size SMALLINT DEFAULT 16
+  font_size SMALLINT DEFAULT 18, theme ENUM(light, dark, system) DEFAULT system
   profile_ct, profile_nonce, profile_dek_wrapped     -- {familyName, givenName, address, photo}
   created_at, updated_at
 
@@ -125,6 +128,7 @@ comments                                  -- at most one per (document, leader)
   id, document_id FK CASCADE, author_id FK users
   body_ct, body_nonce                     -- encrypted with the document's DEK
   state ENUM(draft, submitted), submitted_at NULL, created_at, updated_at
+  seen_by_owner_at NULL                   -- set when the owner opens the entry; drives the "new comment" marker
   UNIQUE (document_id, author_id)
 
 count_entries
@@ -138,7 +142,8 @@ job_runs
 
 sessions
   id_hash (SHA-256 of the cookie value), user_id, kind ENUM(browser, device)
-  device_label NULL, csrf_token, created_at, last_seen_at, expires_at, revoked_at NULL
+  device_label NULL                       -- from the user agent at login ("iPhone · Safari"); no IP geolocation
+  csrf_token, created_at, last_seen_at, expires_at, revoked_at NULL
 
 read_audit                                -- security log only; never shown to diary owners
   leader_id, document_id, read_at
@@ -202,7 +207,7 @@ using `actor.role`, `isOwner`, and the document's `first_submitted_at` and `acce
 | Reader | Can read when |
 |---|---|
 | Owner | Always, including draft and history |
-| COURSE_LEADER | `first_submitted_at` is set. They see the submitted content, history versions, all submitted comments, and their own draft comment. Never the owner's unsubmitted draft. |
+| COURSE_LEADER (not the owner) | `first_submitted_at` is set. They see the submitted content, history versions, all submitted comments, and their own draft comment. Never the owner's unsubmitted draft. |
 | Other NORMAL_USERs | `access = open`: submitted content + submitted comments |
 | SYS_ADMIN | Never. Metadata only (title, date, owner, access state) |
 
@@ -218,23 +223,24 @@ either:  open ──revoke──► private
 Only submitted entries can be shared. All transitions are server-enforced; access fields in draft or submit
 bodies are ignored.
 
-### 7.3 Endpoint matrix (provisional until FRONTEND.md settles the screens)
+### 7.3 Endpoint matrix
 
 | Endpoint | Anon | NORMAL_USER | COURSE_LEADER | SYS_ADMIN |
 |---|---|---|---|---|
 | `GET /api/auth/captcha`; `POST /api/auth/login`, `/register`, `/forgot-password` | ✅ rate-limited | – | – | – |
 | `POST /api/auth/logout`; `GET/PUT /api/me`; `POST /api/me/password`; `GET/DELETE /api/me/sessions…` | – | ✅ | ✅ | ✅ |
 | `POST /api/me/totp/setup`, `/confirm` | – | ✅ optional | ✅ optional | ✅ required |
-| `GET /api/documents/mine?month=` | – | ✅ | ❌ | ❌ |
-| `POST /api/documents`, `PUT /:id/draft`, `POST /:id/submit` | – | own | ❌ | ❌ |
+| `GET /api/documents/mine?month=` → per entry `state, access, commentCount, hasUnseenComment` | – | ✅ | ✅ | ❌ |
+| `POST /api/documents`, `PUT /:id/draft`, `POST /:id/submit` | – | own | own | ❌ |
 | `GET /api/documents/open?month=` | – | ✅ | ✅ | ❌ |
 | `GET /api/documents/:id`, `/:id/versions` | – | per §7.1 | per §7.1 | ❌ |
-| `POST /api/documents/:id/access` (`request`/`withdraw`/`revoke`) | – | own | – | ❌ |
-| `POST /api/documents/:id/access` (`approve`/`decline`/`revoke`) | – | ❌ | ✅ submitted | ❌ |
-| `GET /api/leader/documents?date=&page=&size=` and `?user=&month=` | – | ❌ | ✅ submitted only | ❌ |
+| `POST /api/documents/:id/access` (`request`/`withdraw`/`revoke`) | – | own | own | ❌ |
+| `POST /api/documents/:id/access` (`approve`/`decline`/`revoke`) | – | ❌ | ✅ submitted, not own | ❌ |
+| `GET /api/leader/documents?date=&page=&size=` and `?user=&month=` → per entry `myCommentState, otherLeaderCommented, access` | – | ❌ | ✅ submitted only | ❌ |
+| `GET /api/leader/calendar?month=` → submitted-entry count per day | – | ❌ | ✅ | ❌ |
 | `GET /api/leader/open-requests` | – | ❌ | ✅ | ❌ |
-| `GET /api/leader/users` (names for the user list) | – | ❌ | ✅ | ❌ |
-| `PUT /api/documents/:id/comments/mine` (`{body, state}`) | – | ❌ | ✅ submitted | ❌ |
+| `GET /api/leader/users?month=` → names + entries this month | – | ❌ | ✅ | ❌ |
+| `PUT /api/documents/:id/comments/mine` (`{body, state}`) | – | ❌ | ✅ submitted, not own | ❌ |
 | `GET/POST/PUT/DELETE /api/admin/users…`, `POST /batch-delete` | – | ❌ | ❌ | ✅ (not the last SYS_ADMIN) |
 | `GET /api/admin/password-resets`, `POST /:u/password` | – | ❌ | ❌ | ✅ |
 | `GET /api/admin/documents?user&date`, `DELETE /:id` | – | ❌ | ❌ | ✅ metadata only |
@@ -248,7 +254,7 @@ Translate takes an **id**, not free text. The server checks read access and decr
 keeps the endpoint from becoming a free LLM proxy.
 
 Because each account has exactly one role, separation of duties is automatic: a SYS_ADMIN account can never read
-diaries.
+diaries. A leader's own entries are governed by the owner rows; the leader rows never apply to their own entries.
 
 ## 8. Feature design notes
 
@@ -280,8 +286,9 @@ diaries.
 
 ### 8.3 Diary
 
-- **Editor (§5.2):** contentEditable plus a toolbar limited to the allowlisted tags (`p, h1–h3, b, strong, u,
-  span[style=font-family|font-size], img[src=data:image/(jpeg|png|webp)], br`).
+- **Editor (§5.2):** Tiptap with only the extensions matching the allowlisted tags (`p, h1–h3, b, strong, u,
+  span[style=font-family|font-size], img[src=data:image/(jpeg|png|webp)], br`). The server sanitiser uses the
+  same allowlist, so anything the editor can produce survives sanitising unchanged.
 - **Buttons:** the draft/submit enable logic is a unit-tested reducer. Auto-draft runs every 5 minutes while
   there are unsaved changes.
 - **Images (D6, agreed):**
@@ -291,11 +298,14 @@ diaries.
   - The server caps each image at 1 MB, each document at 8 MB and each request at 10 MB.
 - **Comments:** each leader has at most one comment per entry, which they can save as a draft or submit, and edit
   again later. The owner and permitted readers see all submitted comments, each labelled with its leader's name.
-  When a comment is submitted, the owner gets a toast.
+  A submitted comment the owner hasn't opened yet (`seen_by_owner_at` is NULL) shows as new and raises the
+  有新批注 toast.
 
 ### 8.4 Pages
 
-The screens get their own design in `docs/FRONTEND.md`. The spec's §6 is the starting point.
+Designed in `docs/FRONTEND.md`: role-based tab bar on phones and top bar on desktop; a read view before the
+editor (F1); cards on phones and tables on desktop (F2); approve/decline buttons for open requests (F3);
+traditional characters throughout (F5); no offline writing in v1 (F6).
 
 ### 8.5 报数
 
@@ -363,27 +373,51 @@ returns error codes, not display strings.
   `/internal/` paths are blocked at the proxy. A deploy backs up the DB, pulls the tag, migrates and checks
   `/readyz`. A one-command rollback returns to the previous tag. Hosting is planned for Hong Kong (D9).
 
-## 11. Delivery plan (one green slice at a time)
+## 11. Delivery plan
 
-0. **Frontend design** (`docs/FRONTEND.md`): screens, flows, components, visual direction, the data each screen
-   needs. Then revise §5 and §7 here to match.
-1. **Skeleton:** layout, toolchain pins, lint/format/hooks, CI, compose dev stack, `scripts/dev-setup`,
-   fail-fast config, logging, health checks, `AGENTS.md`.
-2. **Core domain:** crypto keyring + DEK, authz policy, sharing state machine, count input. Unit-tested
-   exhaustively, including an authz table test across every role × action.
-3. **Auth:** CAPTCHA, login with mode radio, register, forgot password, sessions, devices, TOTP, rate limits,
-   `create-sysadmin` CLI.
-4. **SYS_ADMIN:** users and roles, documents (metadata only), password resets.
-5. **Diary:** create, draft, auto-draft, submit, history cap of 3, sanitising, image downscale and caps.
-6. **Leaders:** leader home, calendar, reading, comments, open approvals, read audit.
-7. **Open diaries:** request, withdraw, approve, decline, revoke; the Open Diary list.
-8. **Account:** profile, photo resize to 300×300, password change, devices, font size.
-9. **报数:** page, input rules, settings, admin list, scheduler, job runs.
-10. **Translation.**
-11. **Installable web app:** manifest, service worker, update toast, install UX. Then the phone check for D10.
-12. **Ops:** deploy, TLS, backup/restore, key rotation, RUNBOOK, SECURITY.md, PRIVACY.md, release pipeline.
+**Always deployable.** Every slice ends with `main` green and runnable: `docker compose up` brings up a working
+stack, `/healthz` and `/readyz` pass, migrations apply from empty, and the seed loads. Nothing half-built is
+reachable; unfinished routes simply don't exist yet.
 
-Each slice ships with tests, both languages, permission tests per role, and doc updates (§12.10).
+### Phase A: backend first, proven by tests
+
+Each slice delivers its API, its unit and integration tests (every role, allowed and denied), its seed data, and
+its entries in the API explorer (D20), so it can be checked by hand before any screen exists.
+
+1. **Skeleton:** workspaces, toolchain pins, lint/format/hooks, CI, compose dev stack, `scripts/dev-setup`,
+   fail-fast config, structured logging with request IDs, error shape, `/healthz` + `/readyz`, migrations at
+   startup, `AGENTS.md`.
+2. **Core domain:** crypto keyring + DEK, authz policy table, sharing state machine, count input rules. Pure
+   modules, unit-tested exhaustively.
+3. **Users and auth:** schema, `create-sysadmin` CLI, CAPTCHA, login/logout, sessions and devices, register,
+   forgot password, TOTP, rate limits, seed users.
+4. **SYS_ADMIN API:** users and roles, password resets, document metadata, the "no plaintext for SYS_ADMIN" test.
+5. **Diary API:** create, draft, submit, history cap, sanitising, size caps, seed entries in every state.
+6. **Leader API:** lists, calendar counts, comments, open approvals, read audit.
+7. **Open diaries and sharing API.**
+8. **Account API:** profile, password change, devices, preferences.
+9. **報數 API:** summary, latest, settings, admin list, scheduler, job runs.
+10. **Translation API** (faked in tests).
+
+### Phase B: frontend, iteratively, against seeded data
+
+The dev stack runs the real API with seed data, so every screen is built against realistic content in all
+states. Each slice is one screen group, with Playwright e2e tests at 360 px and 1280 px in both languages.
+
+11. **App shell:** tokens, themes, text sizes, i18n, tab bar/top bar, toasts, error states.
+12. **Login, register, forgot password.**
+13. **My diary, entry view, editor** (Tiptap, image downscaling).
+14. **Leader review and open requests.**
+15. **SYS_ADMIN screens.**
+16. **報數 and account.**
+17. **Installable web app:** manifest, service worker, update toast, install help. Then the phone check for D10.
+
+### Phase C: production
+
+18. **Ops:** deploy to Hong Kong with TLS, backup/restore, key rotation, RUNBOOK, SECURITY.md, PRIVACY.md,
+    release pipeline. (A staging deploy can come earlier, as soon as slice 3 is done, to exercise the pipeline.)
+
+Each slice ships with tests, both languages where it has UI, permission tests per role, and doc updates (§12.10).
 
 ## 12. Decisions
 
@@ -395,11 +429,13 @@ Each slice ships with tests, both languages, permission tests per role, and doc 
 | D4 | Mobile auto-login without storing passwords | **Agreed**: "remember this device" session |
 | D6 | Image downscale and caps | **Agreed**: §8.3 |
 | D8 | App title | **Agreed**: 修行日記 |
-| D9 | Hosting region | **Likely Hong Kong** (no ICP filing needed, low latency to the mainland). Confirm before slice 12 |
+| D9 | Hosting region | **Agreed: Hong Kong** (no ICP filing needed, low latency to the mainland) |
 | D10 | Is the Android wrapper needed? | Open: decide after testing install on users' actual phones |
 | D11 | Courses | **Dropped for now**: one global COURSE_LEADER role |
 | D12 | Second factor | **Agreed**: TOTP required for SYS_ADMIN, optional for others |
 | D13 | 报数 scope | **Agreed**: app-wide |
 | D14 | Show owners who read their entry | **Agreed: no**. The read audit stays internal |
-| D18 | A leader account is deleted: what happens to their comments? | Proposal: submitted comments stay, labelled "former leader"; drafts are deleted |
-| D19 | Can a COURSE_LEADER also keep a diary? | Proposal: no. One role per account; use a second account |
+| D18 | A leader account is deleted | **Agreed**: submitted comments stay, labelled "former leader"; drafts are deleted |
+| D19 | Can a COURSE_LEADER keep a diary? | **Agreed: yes**. Other leaders read and comment on it; a leader never comments on or approves their own entry |
+| D20 | API explorer for checking the backend by hand | **Proposed**: `@fastify/swagger` + `@fastify/swagger-ui` + `fastify-type-provider-zod` (OpenAPI from the zod schemas; assets bundled, no CDN). Enabled in dev/staging, off in production |
+| F1–F6 | Frontend decisions | **Agreed**: see FRONTEND.md §11 |

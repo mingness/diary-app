@@ -3,7 +3,7 @@
 > **Purpose:** a complete functional specification for an AI coding agent to build this application **from scratch** (a web app, installable on phones). It describes *what the app must do and how it flows* — not how the existing code is written.
 > Consolidated from the original requirement rounds (old project `F:\ai_workspace\diary_webapp`) and the deployed, many-times-revised behavior (`F:\ai_workspace\diary-app`).
 > **Revised 2026-10-14:** multiple course leaders and SYS_ADMINs, server-held encryption keys, installable web app instead of an Android app. Design decisions are recorded in `docs/ARCHITECTURE.md`.
-> App title: **修行日記** · Languages: 繁體中文 (default) / English, switchable everywhere.
+> App title: **修行日記** (English: **Cultivation Diary**) · Languages: 繁體中文 (default) / English, switchable everywhere.
 
 ---
 
@@ -27,10 +27,10 @@ This is a private diary platform with a supervision workflow:
 | Role | Count | Purpose |
 |---|---|---|
 | NORMAL_USER | any | Write diaries, read open diaries, report counts |
-| COURSE_LEADER | one or more | Read all submitted diaries, write comments, approve sharing |
+| COURSE_LEADER | one or more | Read all submitted diaries, write comments, approve sharing; may keep their own diary |
 | SYS_ADMIN | one or more (the last one cannot be deleted or demoted) | Manage users & documents (metadata only), reset passwords, administer 报数 |
 
-- Each account has exactly one role. A COURSE_LEADER account is for supervision and does not write diaries; a person who also wants to keep a diary uses a separate NORMAL_USER account.
+- Each account has exactly one role. A COURSE_LEADER may also keep their own diary, exactly like a NORMAL_USER. Other leaders read and comment on it; a leader never comments on or approves sharing for their own diary. (With only one leader, that leader's diaries cannot be opened for sharing.)
 - SYS_ADMIN accounts must log in with a second factor (authenticator app, TOTP).
 - **Production starts empty.** The first SYS_ADMIN is created with a server command-line tool. SYS_ADMINs then create other accounts and assign roles; normal users may also self-register.
 - **Test environments** are seeded with sample accounts and diaries (§11). The seed must refuse to run against production.
@@ -75,9 +75,10 @@ This is a private diary platform with a supervision workflow:
 
 ### 4.4 Account page (all roles)
 - View/edit profile (username read-only); photo picked from local files and resized to 300×300.
-- Font size (12/14/16/18).
+- Text size: 標準 / 大 / 特大 / 超大 (16 / 18 / 20 / 22 px), default 大 (18 px). Many users are older; every page must stay usable at the largest size.
 - Change password: current password + new password + confirm; mismatch → "两次密码输入不同", nothing changes. Other sessions are signed out.
 - Signed-in devices, each with a sign-out button.
+- Theme: light / dark / follow the device.
 - SYS_ADMIN: set up / reset the authenticator app.
 - Logout.
 
@@ -120,6 +121,7 @@ Owner or any COURSE_LEADER unchecks → state = 'Private'
 - A course leader's 暂存 comment → invisible to the user and to other leaders.
 - A course leader's 提交 comment → visible to the owner (and, for Open diaries, to all readers), under the diary content, labelled with the leader's name, with translation buttons. Other course leaders also see it.
 - Owners are not told which leaders have read their diary.
+- If a leader's account is deleted, their submitted comments remain, labelled as from a former leader; their unsubmitted comment drafts are deleted.
 
 ## 6. Pages & Behaviors
 
@@ -156,11 +158,14 @@ Owner or any COURSE_LEADER unchecks → state = 'Private'
 ### 7.1 Count page layout
 ```
 标题: 合计报数
-TOTAL COMPLETED總完成: <total> | REPORTED_TODAY今日報告: <today> (entries紀錄: <n>) | GOAL COUNT目標數: 10,000,000
-<blue progress bar>  total / goal (xx.xx%)
+<progress card>  TOTAL COMPLETED總完成: <total>  (largest figure on the page)
+                 <blue progress bar>
+                 GOAL COUNT目標數: 10,000,000   |   xx.xx% completed (both in large type)
+REPORTED_TODAY今日報告: <today> (entries紀錄: <n>)
 今日报数 | <number box> | <manual submit> | <auto submit checkbox>
 <latest-20 entries table>
 ```
+- The total is the most prominent figure, with the goal and percentage in large type below the bar; there is no separate goal tile.
 - 报数 is app-wide: one shared total for all users.
 - Progress = all-time total ÷ 10,000,000 × 100%. "Today" is the current date in Beijing time. Table columns: Username (family+given name if known), Today's Count, Total, First Count Date, Latest Submit Time. Adjacent rows alternate light / sky-blue; auto-submit users shown in blue; table auto-refreshes (≈ every minute / on submit).
 
@@ -216,7 +221,8 @@ Build this only if testing on the users' actual phones shows the installable web
 6. Notifications are toasts; polling and notifications must not disturb editing.
 7. Bilingual UI throughout; new strings go through the translation table.
 8. Secrets (API keys) live in configuration, never in client code or the repository.
-9. Every page works on a 360 px-wide phone screen.
+9. Every page works on a 360 px-wide phone screen; phones are the primary device for users, while leaders and SYS_ADMINs mostly use a computer.
+10. Light and dark themes; neutral, warm default palette. Navigation stays simple: few top-level destinations, large touch targets, clear labels with icons.
 
 ## 11. Acceptance Checklist
 

@@ -97,10 +97,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: gitleaks (full history)
+      # Checkout fetches every branch and gitleaks defaults to `git log --all`; scope the scan to the
+      # history of the commit under test so other branches' leaks don't fail this one.
+      - name: gitleaks (full history of this commit)
         run: |
           docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.21.2 \
-            git /repo --redact --no-banner --verbose
+            git /repo --redact --no-banner --verbose --log-opts="HEAD"
 
   audit:
     name: Dependency audit

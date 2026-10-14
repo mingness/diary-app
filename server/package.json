@@ -1,0 +1,33 @@
+{
+  "name": "@diary/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsc -b ../shared && tsx watch --env-file=../.env src/main.ts | pino-pretty",
+    "start": "node dist/main.js",
+    "db:generate": "drizzle-kit generate",
+    "test": "vitest run --config ../vitest.config.ts",
+    "test:unit": "vitest run --config ../vitest.config.ts --project unit",
+    "test:integration": "vitest run --config ../vitest.config.ts --project integration",
+    "test:watch": "vitest --config ../vitest.config.ts --project unit",
+    "test:coverage": "vitest run --config ../vitest.config.ts --coverage"
+  },
+  "dependencies": {
+    "@fastify/swagger": "^9.9.2",
+    "@fastify/swagger-ui": "^6.1.2",
+    "drizzle-orm": "^0.45.4",
+    "fastify": "^5.12.7",
+    "fastify-type-provider-zod": "^7.0.0",
+    "pg": "^8.23.1",
+    "pino": "^10.4.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "^0.31.11",
+    "pino-pretty": "^13.2.0",
+    "tsx": "^4.23.15"
+  }
+}

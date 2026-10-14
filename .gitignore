@@ -1,0 +1,20 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Secrets: never commit (engineering standards §12.3)
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+*.pem
+secrets/
+
+# Local data
+.data/
+
+# Per-developer git hook setup (see lefthook.yml)
+lefthook-local.yml
+.lefthook-node.sh

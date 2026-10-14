@@ -1,0 +1,117 @@
+# Runs on every push and pull request; must pass before merging to main (engineering standards §12.8).
+# Stages grow with the delivery plan (docs/ARCHITECTURE.md §11): web build and e2e arrive in Phase B.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  LEFTHOOK: '0'
+
+jobs:
+  check:
+    name: Format, lint, typecheck, unit tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:unit
+
+  integration:
+    name: All tests with coverage (PostgreSQL)
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16.14-alpine
+        env:
+          POSTGRES_USER: diary
+          POSTGRES_PASSWORD: ci-throwaway-password
+          POSTGRES_DB: diary
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U diary -d diary"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://diary:ci-throwaway-password@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w shared
+      # Unit + integration together, so coverage reflects everything (engineering standards §12.5).
+      - run: npm run test:coverage
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 14
+
+  image:
+    name: Build server image and smoke-test the stack
+    runs-on: ubuntu-24.04
+    needs: [check, integration]
+    steps:
+      - uses: actions/checkout@v4
+      - run: node scripts/dev-setup.mjs
+      - run: docker compose up -d --wait --build
+      - name: Ready check
+        run: curl -fsS http://127.0.0.1:3000/readyz
+      - name: Production refuses placeholder secrets
+        run: |
+          set +e
+          docker compose run --rm --no-deps -e NODE_ENV=production \
+            -e CRON_SECRET=change-me-change-me-change-me-change-me server
+          test $? -ne 0
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs
+      - if: always()
+        run: docker compose down -v
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks (full history)
+        run: |
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.21.2 \
+            git /repo --redact --no-banner --verbose
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Production dependencies (fails the build)
+        run: npm audit --omit=dev --audit-level=moderate
+      - name: All dependencies (report only; dev tools never ship)
+        run: npm audit || true

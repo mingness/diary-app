@@ -1,0 +1,19 @@
+# Git hooks (engineering standards §12.3, §12.9): quick checks on the files being committed, so problems are
+# caught before CI. Installed automatically by `npm install`. Bypass in an emergency with `LEFTHOOK=0 git commit`.
+#
+# Hooks run with whatever PATH your git client has, which may not include Node (e.g. VS Code as a Flatpak, or
+# a Node version manager only set up in interactive shells). If a hook says "node: not found", create a
+# git-ignored lefthook-local.yml pointing `rc:` at a script that puts Node on PATH; see AGENTS.md.
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      glob: '*.{ts,js,mjs,json,yml,yaml,md}'
+      exclude: '^docs/'
+      run: ./node_modules/.bin/prettier --check {staged_files}
+    lint:
+      glob: '*.{ts,js,mjs}'
+      run: ./node_modules/.bin/eslint --max-warnings 0 {staged_files}
+    secrets:
+      # Requires the gitleaks binary (https://github.com/gitleaks/gitleaks). CI runs it regardless.
+      run: if command -v gitleaks >/dev/null; then gitleaks git --staged --redact --no-banner; else echo "gitleaks not installed; skipping local secret scan (CI will run it)"; fi

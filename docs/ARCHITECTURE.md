@@ -51,7 +51,7 @@
 | Rich text (web) | **Tiptap** on ProseMirror (F4, agreed) | Replaces deprecated `execCommand`; its schema mirrors the server's sanitiser allowlist |
 | PWA | **vite-plugin-pwa** (Workbox) | Manifest, service worker and update prompt |
 | Tests | **Vitest**, **Playwright**; Postgres from `docker compose` locally and a service container in CI | §12.5; each test file gets its own fresh database; injectable clock and RNG |
-| API explorer | **OpenAPI** generated from the zod route schemas, shown with **Swagger UI** (dev and staging only) | The "dashboard" for checking the API by hand before there is a frontend. **Pending approval** (§12, D20) |
+| API explorer | **OpenAPI** generated from the zod route schemas, shown with **Swagger UI** (dev and staging only) | The "dashboard" for checking the API by hand before there is a frontend, at `/docs`. Agreed (D20); `API_DOCS` turns it on or off |
 | Lint/format | ESLint + Prettier, **lefthook** pre-commit, **gitleaks** | §12.3, §12.9 |
 
 Any runtime dependency not listed here needs approval (§12.1).
@@ -437,5 +437,5 @@ Each slice ships with tests, both languages where it has UI, permission tests pe
 | D14 | Show owners who read their entry | **Agreed: no**. The read audit stays internal |
 | D18 | A leader account is deleted | **Agreed**: submitted comments stay, labelled "former leader"; drafts are deleted |
 | D19 | Can a COURSE_LEADER keep a diary? | **Agreed: yes**. Other leaders read and comment on it; a leader never comments on or approves their own entry |
-| D20 | API explorer for checking the backend by hand | **Proposed**: `@fastify/swagger` + `@fastify/swagger-ui` + `fastify-type-provider-zod` (OpenAPI from the zod schemas; assets bundled, no CDN). Enabled in dev/staging, off in production |
+| D20 | API explorer for checking the backend by hand | **Agreed**: `@fastify/swagger` + `@fastify/swagger-ui` + `fastify-type-provider-zod` (OpenAPI from the zod schemas; assets bundled, no CDN). On by default outside production, off in production; staging sets `API_DOCS=true` |
 | F1–F6 | Frontend decisions | **Agreed**: see FRONTEND.md §11 |

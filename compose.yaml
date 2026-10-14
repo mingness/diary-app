@@ -1,0 +1,44 @@
+# Local development stack. `npm run dev:setup` writes .env with throwaway keys first.
+#   docker compose up -d --wait        whole stack (API on http://localhost:3000)
+#   docker compose up -d --wait db     database only (for `npm run dev` and the integration tests)
+name: cultivation-diary
+
+services:
+  db:
+    image: postgres:16.14-alpine
+    environment:
+      POSTGRES_USER: diary
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run npm run dev:setup to create .env}
+      POSTGRES_DB: diary
+    ports:
+      - '127.0.0.1:${DB_PORT:-55432}:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U diary -d diary']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://diary:${POSTGRES_PASSWORD}@db:5432/diary
+      HOST: 0.0.0.0
+      PORT: '3000'
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - '127.0.0.1:${PORT:-3000}:3000'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3000/readyz >/dev/null || exit 1']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  db-data:

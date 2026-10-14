@@ -90,3 +90,13 @@ describe('nextDailyRunAt (02:00 Beijing = 18:00 UTC the previous day)', () => {
     expect(() => nextDailyRunAt(at('2026-10-14T00:00:00Z'), 1.5)).toThrow(RangeError);
   });
 });
+
+describe('msUntilNextRun', () => {
+  it('waits until the next Beijing time of day for daily jobs, and the interval for frequent ones', async () => {
+    const { msUntilNextRun } = await import('../../../src/scheduler.js');
+    const now = new Date('2026-10-14T18:30:00Z'); // 02:30 in Beijing
+    expect(msUntilNextRun({ dailyAtBeijingHour: 3 }, now)).toBe(30 * 60 * 1000);
+    expect(msUntilNextRun({ dailyAtBeijingHour: 2 }, now)).toBe((23 * 60 + 30) * 60 * 1000);
+    expect(msUntilNextRun({ everyMs: 60_000 }, now)).toBe(60_000);
+  });
+});

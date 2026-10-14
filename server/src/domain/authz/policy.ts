@@ -37,6 +37,8 @@ export const Capability = {
   /** Document metadata only: title, date, owner, state. Never content. */
   ManageDocuments: 'admin.documents',
   ManageCount: 'admin.count',
+  /** Activity log, summary and Attention list: metadata only (spec §6.5.5). */
+  ReviewActivity: 'admin.activity',
   /** Report and view 報數. */
   Count: 'count.participate',
   /** Translate text the actor is already allowed to read. */
@@ -56,6 +58,7 @@ const ROLE_CAPABILITIES: Readonly<Record<Role, ReadonlySet<Capability>>> = {
     C.ManagePasswordResets,
     C.ManageDocuments,
     C.ManageCount,
+    C.ReviewActivity,
     C.Count,
   ]),
 };

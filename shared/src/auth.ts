@@ -12,6 +12,8 @@ export const Username = z
 
 export const Password = z.string().min(8).max(256);
 
+export const Email = z.email().max(200);
+
 /** A photo is a small JPEG the browser has already resized to 300×300 (spec §4.4). */
 export const ProfilePhoto = z
   .string()
@@ -77,7 +79,7 @@ export const TotpCode = z.object({ code: z.string().regex(/^\d{6}$/) });
 export const RegisterRequest = CaptchaAnswer.extend({
   username: Username,
   password: Password,
-  email: z.email().max(200).nullable().default(null),
+  email: Email.nullable().default(null),
   profile: Profile.default({ familyName: '', givenName: '', address: '', photo: null }),
 });
 
@@ -90,6 +92,8 @@ export const MeResponse = z.object({
     email: z.string().nullable(),
     profile: Profile,
     totpEnabled: z.boolean(),
+    /** Total size of the user's stored data (spec §4.4: shown for information; no quota). */
+    storageBytes: z.number().int(),
   }),
   csrfToken: z.string(),
 });

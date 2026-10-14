@@ -8,6 +8,13 @@
       "when": 1791993881733,
       "tag": "0000_users_sessions_captchas",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791999773584,
+      "tag": "0001_activity_alerts_jobs",
+      "breakpoints": true
     }
   ]
 }

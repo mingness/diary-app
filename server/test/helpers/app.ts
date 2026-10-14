@@ -10,6 +10,7 @@ import { loadConfig, type Config } from '../../src/config.js';
 import { createContext, type AppContext } from '../../src/context.js';
 import { runMigrations } from '../../src/db/migrate.js';
 import type { AuthLimits } from '../../src/routes/auth.js';
+import type { FakeMailer } from '../../src/services/mailer.js';
 import { createTestDatabase, type TestDatabase } from './database.js';
 
 export const CAPTCHA_ANSWER = '3';
@@ -61,7 +62,12 @@ export interface TestApp {
 }
 
 export async function createTestApp(
-  options: { authLimits?: Partial<AuthLimits>; env?: Record<string, string> } = {},
+  options: {
+    authLimits?: Partial<AuthLimits>;
+    env?: Record<string, string>;
+    /** Pass a FakeMailer to switch email alerts on; by default email is not configured. */
+    mailer?: FakeMailer;
+  } = {},
 ): Promise<TestApp> {
   const testDb = await createTestDatabase();
   const config = testConfig(options.env);
@@ -73,11 +79,15 @@ export async function createTestApp(
     config,
     database: testDb.database,
     logStream: { write: (line: string) => void logs.push(line) },
-    overrides: { clock: clock.now, captchaQuestion },
+    overrides: { clock: clock.now, captchaQuestion, mailer: options.mailer ?? null },
     authLimits: { ...GENEROUS, ...options.authLimits },
   });
   await app.ready();
-  const ctx = createContext(config, testDb.database.db, { clock: clock.now, captchaQuestion });
+  const ctx = createContext(config, testDb.database.db, {
+    clock: clock.now,
+    captchaQuestion,
+    mailer: options.mailer ?? null,
+  });
   return {
     app,
     ctx,
@@ -133,10 +143,12 @@ export async function login(
   username: string,
   password = TEST_PASSWORD,
   extra: Record<string, unknown> = {},
+  headers: Record<string, string> = {},
 ): Promise<Signin> {
   const res = await app.inject({
     method: 'POST',
     url: '/api/auth/login',
+    headers,
     payload: {
       username,
       password,
@@ -152,4 +164,39 @@ export async function login(
 /** Headers for a signed-in request; includes the CSRF token, which only matters for non-GET requests. */
 export function as(signin: Pick<Signin, 'cookie' | 'csrf'>): Record<string, string> {
   return { cookie: signin.cookie, [CSRF_HEADER]: signin.csrf };
+}
+
+/** A SYS_ADMIN signed in with password and authenticator, optionally with an account email for alerts. */
+export async function signedInAdmin(
+  t: TestApp,
+  /** `remember` signs in as a remembered device (30 days for admins), for tests that move the clock far. */
+  options: { email?: string; remember?: boolean } = {},
+): Promise<Signin & { id: string; username: string }> {
+  const { createSysadmin } = await import('../../src/services/admin-tools.js');
+  const { currentTotpCode, generateTotpSecret } = await import('../../src/domain/auth/totp.js');
+  const { users } = await import('../../src/db/schema.js');
+  const { eq } = await import('drizzle-orm');
+  const username = `adm${Math.random().toString(36).slice(2, 10)}`;
+  const secret = generateTotpSecret();
+  const user = await createSysadmin(t.ctx, {
+    username,
+    password: TEST_PASSWORD,
+    totpSecret: secret,
+    totpCode: currentTotpCode(secret, t.clock.now()),
+  });
+  if (options.email) {
+    await t.ctx.db.update(users).set({ email: options.email }).where(eq(users.id, user.id));
+  }
+  t.clock.advance(MINUTE);
+  const signin = await login(t.app, username, TEST_PASSWORD, {
+    remember: options.remember ?? false,
+  });
+  const res = await t.app.inject({
+    method: 'POST',
+    url: '/api/auth/totp',
+    headers: as(signin),
+    payload: { code: currentTotpCode(secret, t.clock.now()) },
+  });
+  if (res.statusCode !== 200) throw new Error(`admin sign-in failed: ${res.body}`);
+  return { ...signin, csrf: res.json().csrfToken, id: user.id, username };
 }

@@ -28,6 +28,10 @@ export const ErrorCode = {
   /** Missing or wrong X-CSRF-Token header on a request that changes something. */
   CsrfFailed: 'csrf_failed',
   RateLimited: 'rate_limited',
+  /** The change would leave no SYS_ADMIN (deleting or demoting the last one). */
+  LastAdmin: 'last_admin',
+  /** An admin action that can't be applied to one's own account (e.g. deleting it). */
+  SelfAction: 'self_action',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 
@@ -63,6 +67,8 @@ export type Access = z.infer<typeof Access>;
 export * from './roles.js';
 export * from './count.js';
 export * from './auth.js';
+export * from './admin.js';
+export * from './activity.js';
 
 /** Header that must carry the session's CSRF token on every request that changes something. */
 export const CSRF_HEADER = 'x-csrf-token';

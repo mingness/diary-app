@@ -25,6 +25,8 @@ import { FailureThrottle } from './domain/auth/throttle.js';
 import { rateLimited } from './http-errors.js';
 import { loggerOptions } from './logging.js';
 import { installAuth } from './plugins/auth.js';
+import { adminActivityRoutes } from './routes/admin-activity.js';
+import { adminUserRoutes } from './routes/admin-users.js';
 import { authRoutes, DEFAULT_AUTH_LIMITS, type AuthLimits } from './routes/auth.js';
 import { healthRoutes } from './routes/health.js';
 import { meRoutes } from './routes/me.js';
@@ -38,7 +40,7 @@ export interface AppDeps {
   /** Tests pass a stream to capture log lines; production logs to stdout. */
   logStream?: DestinationStream;
   /** Tests pin the time and the CAPTCHA question; production uses the real clock and random questions. */
-  overrides?: Partial<Pick<AppContext, 'clock' | 'captchaQuestion'>>;
+  overrides?: Partial<Pick<AppContext, 'clock' | 'captchaQuestion' | 'mailer'>>;
   /** Per-IP limits on the auth endpoints; tests raise them so they can make many requests. */
   authLimits?: Partial<AuthLimits>;
 }
@@ -154,6 +156,8 @@ export async function buildApp({
     },
   );
   meRoutes(app, ctx);
+  adminUserRoutes(app, ctx);
+  adminActivityRoutes(app, ctx);
 
   return app;
 }

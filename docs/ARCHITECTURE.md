@@ -167,8 +167,10 @@ alerts                                    -- the Attention list and the email ou
   handled_by FK users NULL, handled_at NULL
   emailed_at NULL, email_attempts INT, last_error NULL
 
-job_runs
-  id, job, started_at, finished_at, status ENUM(running, ok, failed), users_processed, entries_written, error
+job_runs                                  -- one row per run of each daily job, so missed or failed runs show
+  id, job, started_at, finished_at NULL, status ENUM(running, ok, failed)
+  summary JSONB NULL                      -- counts only, e.g. {"deleted": 12}
+  error NULL
 
 sessions
   id_hash (SHA-256 of the cookie value), user_id, kind ENUM(browser, device)
@@ -273,13 +275,15 @@ bodies are ignored.
 | `GET /api/leader/open-requests` | – | ❌ | ✅ | ❌ |
 | `GET /api/leader/users?month=` → names + entries this month | – | ❌ | ✅ | ❌ |
 | `PUT /api/documents/:id/comments/mine` (`{body, state}`) | – | ❌ | ✅ submitted, not own | ❌ |
-| `GET/POST/PUT/DELETE /api/admin/users…`, `POST /batch-delete` | – | ❌ | ❌ | ✅ (not the last SYS_ADMIN) |
-| `GET /api/admin/password-resets`, `POST /:u/password` | – | ❌ | ❌ | ✅ |
+| `GET /api/admin/users?q=&role=&status=&page=&size=`; `GET /api/admin/users/:id` | – | ❌ | ❌ | ✅ incl. decrypted profiles |
+| `POST /api/admin/users`; `PATCH /api/admin/users/:id` (role, email, profile; never username) | – | ❌ | ❌ | ✅ not demoting the last SYS_ADMIN |
+| `DELETE /api/admin/users/:id`; `POST /api/admin/users/batch-delete` (NORMAL_USER only) | – | ❌ | ❌ | ✅ not yourself, not the last SYS_ADMIN |
+| `POST /api/admin/users/:id/password` (chosen or generated; unlocks reset-pending); `DELETE /api/admin/users/:id/totp` | – | ❌ | ❌ | ✅ (TOTP: not your own) |
 | `GET /api/admin/documents?user&date`, `DELETE /:id` | – | ❌ | ❌ | ✅ metadata only |
 | `GET /api/count/summary`, `/latest`; `POST /api/count` (`{count, countDate}`); `GET/PUT /api/count/settings` | – | ✅ | ✅ | ✅ |
 | `GET /api/admin/count/users`, `PUT /:u/auto`, `DELETE /:u/entries?from=&to=`, `GET /job-runs`, `POST /run-now` | – | ❌ | ❌ | ✅ |
-| `GET /api/admin/attention`, `POST /:id/handled`; `GET /api/admin/activity?user=&from=&to=`, `/activity/summary` | – | ❌ | ❌ | ✅ metadata only |
-| `POST /api/admin/users/:u/sign-out-all`, `/lock` | – | ❌ | ❌ | ✅ |
+| `GET /api/admin/attention?status=`, `/attention/status`, `POST /api/admin/attention/:id/handled`; `GET /api/admin/activity?userId=&kind=&from=&to=`, `/activity/summary?sort=` | – | ❌ | ❌ | ✅ metadata only |
+| `POST /api/admin/users/:id/sign-out-all`, `/lock` | – | ❌ | ❌ | ✅ (lock: not yourself, never the last usable SYS_ADMIN) |
 | `POST /api/translate` (`{documentId}` or `{commentId}`, direction) | – | readable only, rate-limited | same | ❌ |
 | `POST /internal/count/auto-run` | Bearer `CRON_SECRET`, internal network only | | | |
 | `GET /healthz`, `/readyz` | ✅ | | | |
@@ -410,7 +414,10 @@ follows §9, with a SHA-256 check and signer-match check before installing (§12
 
 ### 8.9 Activity, Attention list and alerts (D26, D27)
 
-- **Activity log:** routes record `activity_events` for the kinds listed in §5. Metadata only: the same rule as
+- **Activity log:** routes record `activity_events` for the kinds listed in §5. Recording never breaks the
+  request it describes (a failure is logged and the request carries on). Failed logins are recorded only for
+  usernames that exist: a mistyped username is often a password typed into the wrong box. A device is "new"
+  when the account hasn't signed in from the same coarse device label in 90 days. Metadata only: the same rule as
   logging (no content, comments, titles or profile fields), with a test that greps events for seeded
   plaintext. A nightly job deletes events older than 90 days. PRIVACY.md says what is recorded and for how long.
 - **Attention rules** (pure, in `domain/limits`, thresholds as constants to tune after real use): any
@@ -419,6 +426,10 @@ follows §9, with a SHA-256 check and signer-match check before installing (§12
   exists.
 - **In-app first:** the Attention list (badge with the unhandled count) is always on and is the source of
   truth. It works with no email configured.
+- **Thresholds (initial):** 10 failed logins for one username within an hour; 3 new devices within 24 hours;
+  any limit reached. Constants in `server/src/domain/limits/attention.ts`.
+- **Locking** can't target yourself, and two admins locking each other at once can't leave nobody able to
+  sign in (admin rows are locked and counted in one transaction, as for demotion).
 - **Email, optional:** when `SMTP_URL` is set, a scheduler task sends unsent alerts to every SYS_ADMIN's account
   email, with retries, at most one email per flagged user per hour, plus a daily summary. Sending never runs in
   the request that raised the alert, so a slow or failed mailbox can't affect users. Failures are recorded on
@@ -488,10 +499,14 @@ its entries in the API explorer (D20), so it can be checked by hand before any s
    modules, unit-tested exhaustively.
 3. **Users and auth:** schema, `create-sysadmin` CLI, CAPTCHA, login/logout, sessions and devices, register,
    forgot password, TOTP, rate limits, seed users. Activity events for logins, failed logins and new devices.
-4. **SYS_ADMIN API:** users and roles, password resets, document metadata, the "no plaintext for SYS_ADMIN" test.
-   Activity log and summary, Attention list, sign-out-all and lock, the email sender (optional SMTP).
+4. **SYS_ADMIN API:** users and roles, password resets, the lint rules keeping the diary keyring out of admin
+   code, activity log and summary, Attention list, sign-out-all and lock, the scheduler (`job_runs`,
+   advisory locks, retention) and the email sender (optional SMTP). *(Done; step 3's activity events for
+   logins, failed logins and new devices were added here.)*
 5. **Diary API:** create, draft, submit and update, history cap, sanitising, size caps, server-set entry date,
-   daily and per-entry limits, storage usage, seed entries in every state.
+   daily and per-entry limits (recording `limit_reached` and the entry activity events), storage usage
+   extended to entries, seed entries in every state. Then SYS_ADMIN document metadata and deletes, and the
+   "no plaintext for SYS_ADMIN" test, which moved here from step 4 because it needs real encrypted entries.
 6. **Leader API:** lists, calendar counts, comments, open approvals, read audit.
 7. **Open diaries and sharing API.**
 8. **Account API:** profile, password change, devices, preferences.

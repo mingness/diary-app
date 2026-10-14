@@ -29,6 +29,11 @@ export interface Config {
    * end-to-end tests can sign in. Refused in production.
    */
   readonly captchaFixed: boolean;
+  /**
+   * Optional SMTP for admin alert emails, e.g. `smtps://<address>:<authorization code>@smtp.qq.com:465`.
+   * A secret (it holds the mailbox's authorization code). Without it, alerts stay in the app only.
+   */
+  readonly smtp: { readonly url: string; readonly from: string } | null;
 }
 
 export class ConfigError extends Error {
@@ -66,6 +71,15 @@ const envSchema = z.object({
   CRON_SECRET: z.string().min(32),
   API_DOCS: z.enum(['true', 'false']).optional(),
   CAPTCHA_FIXED: z.enum(['true', 'false']).default('false'),
+  SMTP_URL: z
+    .string()
+    .regex(/^smtps?:\/\/\S+$/)
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  MAIL_FROM: z
+    .email()
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
 });
 
 const defaultMigrationsDir = new URL('../../db/migrations', import.meta.url).pathname;
@@ -95,7 +109,11 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
     }
     // A predictable CAPTCHA must never reach real users.
     if (env.CAPTCHA_FIXED === 'true') invalid.add('CAPTCHA_FIXED');
+    if (env.SMTP_URL && looksLikeDummy(env.SMTP_URL)) invalid.add('SMTP_URL');
   }
+
+  // Email needs both a server and a sender address, or neither.
+  if (env.SMTP_URL && !env.MAIL_FROM) invalid.add('MAIL_FROM');
 
   if (!parsed.success || invalid.size > 0 || !diaryKeyring || !profileKeyring) {
     throw new ConfigError([...invalid].sort());
@@ -115,5 +133,6 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
     cronSecret: e.CRON_SECRET,
     apiDocs: e.API_DOCS === undefined ? e.NODE_ENV !== 'production' : e.API_DOCS === 'true',
     captchaFixed: e.CAPTCHA_FIXED === 'true',
+    smtp: e.SMTP_URL && e.MAIL_FROM ? { url: e.SMTP_URL, from: e.MAIL_FROM } : null,
   };
 }

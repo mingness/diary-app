@@ -31,6 +31,7 @@ import type { FailureThrottle } from '../domain/auth/throttle.js';
 import { checkTotp } from '../domain/auth/totp.js';
 import { captchaFailed, HttpError, invalidCredentials, rateLimited } from '../http-errors.js';
 import { authOf, clearSessionCookie, requireAuth, setSessionCookie } from '../plugins/auth.js';
+import { recordActivity, recordLogin, safely } from '../services/activity.js';
 import { consumeCaptcha, issueCaptcha } from '../services/captchas.js';
 import { openTotpSecret } from '../services/profiles.js';
 import {
@@ -130,15 +131,25 @@ export function authRoutes(
       if (!(await consumeCaptcha(ctx, captchaId, captchaAnswer))) throw captchaFailed();
 
       const throttleKey = username.trim().toLowerCase();
-      if (throttles.password.isBlocked(throttleKey)) throw rateLimited();
-
       const user = await findUserByUsername(ctx, username);
+      // Failed attempts are recorded for real accounts only: a mistyped username is often a password typed
+      // into the wrong box, and must never be stored.
+      const recordFailure = (reason: string) =>
+        user
+          ? safely(request.log, () => recordActivity(ctx, user, 'login_failed', { reason }))
+          : Promise.resolve();
+
+      if (throttles.password.isBlocked(throttleKey)) {
+        await recordFailure('throttled');
+        throw rateLimited();
+      }
       const passwordOk = user
         ? await verifyPassword(user.passwordHash, password)
         : await verifyAgainstDummy(password);
       if (!user || !passwordOk || user.resetPending) {
         throttles.password.recordFailure(throttleKey);
         request.log.info({ event: 'login_failed' }, 'login failed');
+        await recordFailure(passwordOk ? 'locked' : 'password');
         throw invalidCredentials();
       }
       throttles.password.reset(throttleKey);
@@ -160,6 +171,7 @@ export function authRoutes(
       });
       setSessionCookie(reply, ctx, token, kind, user.role, mfa);
       request.log.info({ event: 'login', userId: user.id, mfa }, 'login');
+      await safely(request.log, () => recordLogin(ctx, user, session.deviceLabel));
 
       if (mfa === 'pending')
         return { status: 'totp_required' as const, csrfToken: session.csrfToken };
@@ -178,7 +190,7 @@ export function authRoutes(
     '/api/auth/totp',
     {
       config: { rateLimit: limits.totp },
-      preHandler: requireAuth({ allowMfa: ['pending'] }),
+      onRequest: requireAuth({ allowMfa: ['pending'] }),
       schema: {
         tags: AUTH_TAG,
         summary: 'Second login step: the 6-digit authenticator code',
@@ -204,6 +216,9 @@ export function authRoutes(
       const check = checkTotp(secret, request.body.code, ctx.clock(), user.totpLastStep);
       if (!check.ok) {
         throttles.totp.recordFailure(key);
+        await safely(request.log, () =>
+          recordActivity(ctx, user, 'login_failed', { reason: 'totp' }),
+        );
         request.log.info({ event: 'totp_failed', userId: user.id }, 'authenticator code rejected');
         throw new HttpError(401, ErrorCode.TotpInvalid, 'Wrong or reused authenticator code');
       }
@@ -217,7 +232,7 @@ export function authRoutes(
   routes.post(
     '/api/auth/logout',
     {
-      preHandler: requireAuth({ allowMfa: ['pending', 'enrolment_required'] }),
+      onRequest: requireAuth({ allowMfa: ['pending', 'enrolment_required'] }),
       schema: { tags: AUTH_TAG, summary: 'Sign out this session', response: { 200: OkResponse } },
     },
     async (request, reply) => {

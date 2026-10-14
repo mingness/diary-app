@@ -30,7 +30,8 @@ export interface NewUser {
   readonly profile: Profile;
 }
 
-function isUniqueViolation(err: unknown, constraint: string): boolean {
+/** True for a PostgreSQL unique-constraint violation on the named constraint. */
+export function isUniqueViolation(err: unknown, constraint: string): boolean {
   const cause = (err as { cause?: unknown }).cause ?? err;
   const pgErr = cause as { code?: string; constraint?: string };
   return pgErr.code === '23505' && pgErr.constraint === constraint;

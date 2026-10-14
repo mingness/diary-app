@@ -103,6 +103,38 @@ describe('loadConfig', () => {
     });
   });
 
+  describe('SMTP (optional alert email)', () => {
+    it('is off when unset or empty', () => {
+      expect(loadConfig(validEnv()).smtp).toBeNull();
+      expect(loadConfig(validEnv({ SMTP_URL: '', MAIL_FROM: '' })).smtp).toBeNull();
+    });
+
+    it('needs a sender address alongside the server', () => {
+      expect(
+        configErrorFor(validEnv({ SMTP_URL: 'smtps://a@qq.com:code@smtp.qq.com:465' }))
+          .invalidVariables,
+      ).toEqual(['MAIL_FROM']);
+      expect(
+        loadConfig(
+          validEnv({ SMTP_URL: 'smtps://a@qq.com:code@smtp.qq.com:465', MAIL_FROM: 'a@qq.com' }),
+        ).smtp,
+      ).toEqual({ url: 'smtps://a@qq.com:code@smtp.qq.com:465', from: 'a@qq.com' });
+    });
+
+    it('rejects anything that is not an smtp(s) URL, and placeholders in production', () => {
+      expect(
+        configErrorFor(validEnv({ SMTP_URL: 'https://mail.example', MAIL_FROM: 'a@b.cn' }))
+          .invalidVariables,
+      ).toEqual(['SMTP_URL']);
+      const prod = validEnv({
+        NODE_ENV: 'production',
+        SMTP_URL: 'smtps://a@qq.com:change-me@smtp.qq.com:465',
+        MAIL_FROM: 'a@qq.com',
+      });
+      expect(configErrorFor(prod).invalidVariables).toEqual(['SMTP_URL']);
+    });
+  });
+
   describe('CAPTCHA_FIXED', () => {
     it('is off unless asked for', () => {
       expect(loadConfig(validEnv()).captchaFixed).toBe(false);

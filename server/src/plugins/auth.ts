@@ -11,7 +11,7 @@ import type {
   FastifyInstance,
   FastifyReply,
   FastifyRequest,
-  preHandlerAsyncHookHandler,
+  onRequestAsyncHookHandler,
 } from 'fastify';
 import { CSRF_HEADER, type Role } from '@diary/shared';
 import type { AppContext } from '../context.js';
@@ -98,12 +98,15 @@ function csrfMatches(request: FastifyRequest, expected: string): boolean {
 }
 
 /**
+ * Guards run as route `onRequest` hooks, after the global hook above has loaded the session and before the
+ * body is parsed or validated, so anonymous callers get 401 rather than learning about request formats.
+ *
  * Requires a signed-in session. `allowMfa` lists the incomplete second-factor states that may still use this
  * route (e.g. the authenticator step itself); fully authenticated sessions are always allowed.
  */
 export function requireAuth(
   options: { allowMfa?: readonly MfaState[] } = {},
-): preHandlerAsyncHookHandler {
+): onRequestAsyncHookHandler {
   return async (request) => {
     const auth = request.auth;
     if (!auth) throw unauthorized();
@@ -116,7 +119,7 @@ export function requireAuth(
 }
 
 /** Requires a fully signed-in session whose role grants `capability`. */
-export function requireCapability(capability: Capability): preHandlerAsyncHookHandler[] {
+export function requireCapability(capability: Capability): onRequestAsyncHookHandler[] {
   return [
     requireAuth(),
     async (request) => {

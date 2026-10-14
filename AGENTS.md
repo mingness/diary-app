@@ -56,7 +56,9 @@ Keep this file up to date when commands, conventions or pitfalls change.
   writing a destructive migration.
 - **Routes declare zod schemas** for params, body and every response (use `app.withTypeProvider<ZodTypeProvider>()`).
   That validates requests and feeds the API explorer; a route without a response schema is incomplete.
-- **Auth in routes:** guard with `requireAuth()` or `requireCapability(...)` from `server/src/plugins/auth.ts`,
+- **Auth in routes:** guard with `onRequest: requireAuth()` or `onRequest: requireCapability(...)` from
+  `server/src/plugins/auth.ts` (not `preHandler`, which runs after body validation, so anonymous callers would
+  get 400 instead of 401),
   and read the session with `authOf(request)`. Anything that changes data automatically needs the
   `X-CSRF-Token` header. Never trust a role or user ID sent in a request body.
 - **Time and randomness** come from the context (`ctx.clock()`, `ctx.captchaQuestion()`), never `new Date()`
@@ -65,6 +67,17 @@ Keep this file up to date when commands, conventions or pitfalls change.
   translates them. Never put stack traces or secrets in responses.
 - **Logging:** structured, via `request.log` / `app.log`. Never log passwords, tokens, keys, diary content,
   comments or profile fields; the redaction list in `server/src/logging.ts` is a backstop, not permission.
+- **The diary keyring** is only for `server/src/services/diary/`; lint enforces it (tested in
+  `server/test/unit/lint-rules.test.ts`). Never work around the rule.
+- **Activity events:** record them with `recordActivity`/`recordLogin` wrapped in `safely(...)` so a logging
+  failure never breaks the user's request. `detail` holds small facts only (device label, reason, which
+  limit); never content, titles or profile fields.
+- **Scheduled jobs** live in `server/src/jobs.ts` and run via `server/src/scheduler.ts` (started by `main.ts`
+  only). Tests call a job's function directly, or `runJob` to check run records and locking.
+- **Email** goes through `ctx.mailer`; tests pass a `FakeMailer` to `createTestApp({ mailer })`. Without
+  `SMTP_URL` there is no mailer and alerts stay in the app.
+- **Race conditions** (e.g. the last-admin rules) are tested at the service level with simultaneous calls over
+  several rounds; over HTTP the first request usually finishes first and hides the race.
 - **Config:** only through `loadConfig` in `server/src/config.ts`. Add every new variable to `.env.example`
   with a comment, and to `scripts/dev-setup.mjs` if it is a secret.
 - **Comments** explain why, not what. Public functions get a doc comment.

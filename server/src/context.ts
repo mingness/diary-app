@@ -5,6 +5,7 @@
 import type { Config } from './config.js';
 import type { Db } from './db/client.js';
 import { generateQuestion, type CaptchaQuestion } from './domain/auth/captcha.js';
+import { createSmtpMailer, type Mailer } from './services/mailer.js';
 
 /** The question every CAPTCHA asks when CAPTCHA_FIXED is on (development and tests only). */
 export const FIXED_CAPTCHA: CaptchaQuestion = { a: 1, op: '+', b: 2, answer: 3 };
@@ -15,12 +16,14 @@ export interface AppContext {
   readonly clock: () => Date;
   /** Produces CAPTCHA questions; tests replace it with a fixed question so they know the answer. */
   readonly captchaQuestion: () => CaptchaQuestion;
+  /** Sends admin alert emails; null when SMTP isn't configured (alerts then stay in the app). */
+  readonly mailer: Mailer | null;
 }
 
 export function createContext(
   config: Config,
   db: Db,
-  overrides: Partial<Pick<AppContext, 'clock' | 'captchaQuestion'>> = {},
+  overrides: Partial<Pick<AppContext, 'clock' | 'captchaQuestion' | 'mailer'>> = {},
 ): AppContext {
   return {
     config,
@@ -29,5 +32,11 @@ export function createContext(
     captchaQuestion:
       overrides.captchaQuestion ??
       (config.captchaFixed ? () => FIXED_CAPTCHA : () => generateQuestion()),
+    mailer:
+      overrides.mailer !== undefined
+        ? overrides.mailer
+        : config.smtp
+          ? createSmtpMailer(config.smtp)
+          : null,
   };
 }

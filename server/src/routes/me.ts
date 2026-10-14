@@ -14,6 +14,7 @@ import { HttpError } from '../http-errors.js';
 import { authOf, requireAuth } from '../plugins/auth.js';
 import { openProfile, openTotpSecret, sealTotpSecret } from '../services/profiles.js';
 import { setSessionMfa } from '../services/sessions.js';
+import { storageBytesFor } from '../services/storage.js';
 import { toSessionUser } from './auth.js';
 
 const ME_TAG = ['me'];
@@ -25,7 +26,7 @@ export function meRoutes(app: FastifyInstance, ctx: AppContext): void {
   routes.get(
     '/api/me',
     {
-      preHandler: enrolmentAllowed,
+      onRequest: enrolmentAllowed,
       schema: {
         tags: ME_TAG,
         summary: 'The signed-in user, including the decrypted profile',
@@ -41,6 +42,7 @@ export function meRoutes(app: FastifyInstance, ctx: AppContext): void {
           email: user.email,
           profile: openProfile(ctx.config.profileKeyring, user.id, user),
           totpEnabled: user.totpEnabledAt !== null,
+          storageBytes: await storageBytesFor(ctx, user.id),
         },
         csrfToken: session.csrfToken,
       };
@@ -50,7 +52,7 @@ export function meRoutes(app: FastifyInstance, ctx: AppContext): void {
   routes.post(
     '/api/me/totp/setup',
     {
-      preHandler: enrolmentAllowed,
+      onRequest: enrolmentAllowed,
       schema: {
         tags: ME_TAG,
         summary:
@@ -83,7 +85,7 @@ export function meRoutes(app: FastifyInstance, ctx: AppContext): void {
   routes.post(
     '/api/me/totp/confirm',
     {
-      preHandler: enrolmentAllowed,
+      onRequest: enrolmentAllowed,
       schema: {
         tags: ME_TAG,
         summary:

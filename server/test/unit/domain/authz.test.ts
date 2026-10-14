@@ -184,12 +184,15 @@ describe('role capabilities', () => {
     expect(rolesWith(C.LeaderReview)).toEqual(['COURSE_LEADER']);
   });
 
-  it.each([C.ManageUsers, C.ManagePasswordResets, C.ManageDocuments, C.ManageCount])(
-    'only SYS_ADMIN has %s',
-    (capability) => {
-      expect(rolesWith(capability)).toEqual(['SYS_ADMIN']);
-    },
-  );
+  it.each([
+    C.ManageUsers,
+    C.ManagePasswordResets,
+    C.ManageDocuments,
+    C.ManageCount,
+    C.ReviewActivity,
+  ])('only SYS_ADMIN has %s', (capability) => {
+    expect(rolesWith(capability)).toEqual(['SYS_ADMIN']);
+  });
 
   it('every role can take part in 報數', () => {
     expect(rolesWith(C.Count)).toEqual(ROLES);

@@ -12,6 +12,7 @@ import {
   customType,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   smallint,
@@ -114,4 +115,85 @@ export const captchas = pgTable(
     expiresAt: timestamptz('expires_at').notNull(),
   },
   (t) => [index('captchas_expires_idx').on(t.expiresAt)],
+);
+
+// ---------------------------------------------------------------------------------------------------------
+// Activity, Attention list and alerts (docs/ARCHITECTURE.md §8.9, D26, D27). Metadata only: never content,
+// titles or profile fields.
+
+export const activityKindEnum = pgEnum('activity_kind', [
+  'entry_created',
+  'entry_submitted',
+  'entry_updated',
+  'count_entry',
+  'limit_reached',
+  'login',
+  'login_failed',
+  'new_device',
+  'password_changed',
+]);
+
+export const activityEvents = pgTable(
+  'activity_events',
+  {
+    id: uuid('id').primaryKey(),
+    /** Null once the user is deleted; `username` keeps the event readable. */
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    username: text('username').notNull(),
+    kind: activityKindEnum('kind').notNull(),
+    /** Small structured facts, e.g. {"device": "iPhone · Safari"} or {"limit": "submit"}. Never content. */
+    detail: jsonb('detail').$type<Record<string, string | number | boolean>>(),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('activity_user_time_idx').on(t.userId, t.createdAt),
+    index('activity_kind_time_idx').on(t.kind, t.createdAt),
+  ],
+);
+
+export const alertRuleEnum = pgEnum('alert_rule', [
+  'limit_reached',
+  'login_failures',
+  'new_devices',
+]);
+
+export const alerts = pgTable(
+  'alerts',
+  {
+    id: uuid('id').primaryKey(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    username: text('username').notNull(),
+    rule: alertRuleEnum('rule').notNull(),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+    handledBy: uuid('handled_by').references(() => users.id, { onDelete: 'set null' }),
+    handledAt: timestamptz('handled_at'),
+    emailedAt: timestamptz('emailed_at'),
+    emailAttempts: integer('email_attempts').notNull().default(0),
+    lastError: text('last_error'),
+  },
+  (t) => [
+    // While an alert for a user and rule is unhandled, further triggers don't add more rows.
+    uniqueIndex('alerts_open_user_rule_key')
+      .on(t.userId, t.rule)
+      .where(sql`${t.handledAt} IS NULL`),
+    index('alerts_created_idx').on(t.createdAt),
+  ],
+);
+
+export const jobStatusEnum = pgEnum('job_status', ['running', 'ok', 'failed']);
+
+/** One row per run of a scheduled job, so a missed or failed run is visible (engineering standards §12.7). */
+export const jobRuns = pgTable(
+  'job_runs',
+  {
+    id: uuid('id').primaryKey(),
+    job: text('job').notNull(),
+    startedAt: timestamptz('started_at').notNull(),
+    finishedAt: timestamptz('finished_at'),
+    status: jobStatusEnum('status').notNull(),
+    /** Counts only, e.g. {"deleted": 12}. */
+    summary: jsonb('summary').$type<Record<string, number>>(),
+    error: text('error'),
+  },
+  (t) => [index('job_runs_job_time_idx').on(t.job, t.startedAt)],
 );

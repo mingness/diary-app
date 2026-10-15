@@ -1,0 +1,30 @@
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.result {
+  white-space: pre-wrap;
+  padding: var(--space-3) var(--space-4);
+  border-left: 4px solid var(--blue);
+  background: var(--blue-soft);
+  border-radius: var(--radius-input);
+}
+
+.resultLabel {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.off {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}

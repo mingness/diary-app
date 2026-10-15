@@ -4,10 +4,19 @@
  */
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { Link, Navigate, Outlet, createBrowserRouter, useRouteError } from 'react-router';
+import {
+  Link,
+  Navigate,
+  Outlet,
+  ScrollRestoration,
+  createBrowserRouter,
+  useRouteError,
+  type RouteObject,
+} from 'react-router';
+import type { Role } from '@diary/shared';
 import { RouterProvider } from 'react-router/dom';
 import { ApiError } from './api/client.js';
-import { useSession, type Session } from './api/session.js';
+import { useMe, useSession, type Session } from './api/session.js';
 import { AppShell } from './components/AppShell.js';
 import { AuthLayout } from './components/AuthLayout.js';
 import { Button } from './components/Button.js';
@@ -21,6 +30,8 @@ import { EnrolScreen } from './screens/auth/EnrolScreen.js';
 import { ForgotPasswordScreen } from './screens/auth/ForgotPasswordScreen.js';
 import { LoginScreen } from './screens/auth/LoginScreen.js';
 import { RegisterScreen } from './screens/auth/RegisterScreen.js';
+import { MyDiaryScreen } from './screens/diary/MyDiaryScreen.js';
+import { OpenDiaryScreen } from './screens/diary/OpenDiaryScreen.js';
 
 /** Waits for the session; a failed check (not "signed out", which is a valid answer) offers a retry. */
 function SessionGate({ children }: { children: (session: Session) => ReactNode }) {
@@ -71,6 +82,52 @@ function ApplyAppearance({ fontSize, theme }: Parameters<typeof applyAppearance>
   return null;
 }
 
+/** Screens for some roles only; the server refuses the others anyway, this just shows "not found". */
+function ForRoles({ roles }: { roles: readonly Role[] }) {
+  const me = useMe();
+  return roles.includes(me.role) ? <Outlet /> : <NotFound />;
+}
+
+/** Until 報數 (slice 16) and the leader and admin homes (slices 14–15) exist, land somewhere real. */
+function NotYetBuilt() {
+  const me = useMe();
+  return <Navigate to={me.role === 'SYS_ADMIN' ? '/me' : '/diary'} replace />;
+}
+
+const WRITERS: readonly Role[] = ['NORMAL_USER', 'COURSE_LEADER'];
+
+/** Detail screens hide the phone tab bar and show a back button instead (FRONTEND.md §3). */
+const detail = { handle: { detail: true } };
+
+const diaryRoutes: RouteObject[] = [
+  { path: '/diary', element: <MyDiaryScreen /> },
+  { path: '/open', element: <OpenDiaryScreen /> },
+  {
+    // The Tiptap screens load on first use, so sign-in and the lists stay light.
+    path: '/diary/:id/edit',
+    ...detail,
+    lazy: async () => ({
+      Component: (await import('./screens/diary/EditorScreen.js')).EditorScreen,
+    }),
+  },
+  {
+    path: '/diary/:id',
+    ...detail,
+    lazy: async () => {
+      const { EntryScreen } = await import('./screens/diary/EntryScreen.js');
+      return { Component: () => <EntryScreen fallback="/diary" /> };
+    },
+  },
+  {
+    path: '/open/:id',
+    ...detail,
+    lazy: async () => {
+      const { EntryScreen } = await import('./screens/diary/EntryScreen.js');
+      return { Component: () => <EntryScreen fallback="/open" /> };
+    },
+  },
+];
+
 function Home() {
   const { data } = useSession();
   if (data?.status !== 'ready') return null;
@@ -107,6 +164,12 @@ function Crashed() {
 
 const router = createBrowserRouter([
   {
+    element: (
+      <>
+        <ScrollRestoration />
+        <Outlet />
+      </>
+    ),
     errorElement: <Crashed />,
     children: [
       {
@@ -122,12 +185,9 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <Home /> },
           { path: '/me', element: <AccountScreen /> },
-          // Landing destinations whose screens arrive in later slices (ARCHITECTURE §11) show the account
-          // page until then, so sign-in always lands somewhere real.
-          ...['/count', '/diary', '/review', '/admin'].map((path) => ({
-            path,
-            element: <Navigate to="/me" replace />,
-          })),
+          { element: <ForRoles roles={WRITERS} />, children: diaryRoutes },
+          // Landing destinations whose screens arrive in later slices (ARCHITECTURE §11).
+          ...['/count', '/review', '/admin'].map((path) => ({ path, element: <NotYetBuilt /> })),
           { path: '*', element: <NotFound /> },
         ],
       },

@@ -2,7 +2,7 @@
  * Encrypted profile fields (docs/ARCHITECTURE.md §6.3). Each user has a profile DEK, wrapped by
  * PROFILE_KEYRING, which encrypts {familyName, givenName, address, photo} and the TOTP secret.
  */
-import { Profile } from '@diary/shared';
+import { Profile, personName } from '@diary/shared';
 import { openText, sealText } from '../domain/crypto/aead.js';
 import { dekContext, fieldAad } from '../domain/crypto/contexts.js';
 import { generateDek, unwrapDek, wrapDek } from '../domain/crypto/dek.js';
@@ -41,10 +41,9 @@ export function openProfile(keyring: Keyring, userId: string, row: SealedProfile
   return Profile.parse(JSON.parse(json));
 }
 
-/** Display name for lists: "family given", or the username when no name is set. */
+/** Display name for lists (written as `personName` says), or the username when no name is set. */
 export function displayName(profile: Profile, username: string): string {
-  const name = `${profile.familyName}${profile.givenName}`.trim();
-  return name === '' ? username : name;
+  return personName(profile.familyName, profile.givenName) || username;
 }
 
 export function sealTotpSecret(

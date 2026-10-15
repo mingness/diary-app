@@ -1,0 +1,51 @@
+/* Diary and comment text: the serif journal face (FRONTEND.md §1.5). Shared by the editor and the read view. */
+.content {
+  font-family: var(--font-serif);
+  line-height: 1.8;
+}
+
+.content :global(.ProseMirror) {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+
+.content :global(.ProseMirror) > * + * {
+  margin-top: 0.75em;
+}
+
+.content p {
+  margin: 0;
+}
+
+.content h1 {
+  font-size: 1.5em;
+}
+
+.content h2 {
+  font-size: 1.3em;
+}
+
+.content h3 {
+  font-size: 1.15em;
+}
+
+.content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-input);
+}
+
+.content :global(.ProseMirror-selectednode) img,
+.content img:global(.ProseMirror-selectednode) {
+  outline: 3px solid var(--focus);
+}
+
+.content :global(p.is-editor-empty:first-child)::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--muted);
+  pointer-events: none;
+}

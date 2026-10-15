@@ -12,8 +12,9 @@ activity log, Attention list and optional email alerts; the diary (encrypted ent
 history, limits, sanitising) and SYS_ADMIN document management; the leader API (review lists, calendar,
 reading submitted entries with a read audit, comments, sharing requests and approvals); open diaries; the account API (profile, appearance, password, devices); 報數 (count, progress, auto-submit at
 02:00 Beijing, SYS_ADMIN tools); translation through an optional OpenAI-compatible provider. Phase B (the web
-app) has begun: the app shell (themes, text sizes, both languages) and sign-in, registration, forgot password
-and authenticator setup (slices 11–12). Next: my diary, the entry view and the editor. Features arrive slice
+app) has begun: the app shell (themes, text sizes, both languages); sign-in, registration, forgot password
+and authenticator setup; my diary, the entry view, the editor (photos, limits, 提交/更新, history) and open
+diaries (slices 11–13). Next: the leaders' review screens. Features arrive slice
 by slice (see the delivery plan in ARCHITECTURE.md §11).
 
 ## Quick start

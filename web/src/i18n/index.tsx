@@ -19,9 +19,6 @@ export type { Lang, MessageKey } from './messages.js';
 
 const TABLES: Record<Lang, Messages> = { 'zh-Hant': zhHant, en };
 
-/** The locale for `Intl` date and number formatting. */
-export const INTL_LOCALE: Record<Lang, string> = { 'zh-Hant': 'zh-Hant-TW', en: 'en-GB' };
-
 export function initialLang(): Lang {
   return readPref('lang') === 'en' ? 'en' : 'zh-Hant';
 }

@@ -85,6 +85,7 @@ export * from './warning-levels.js';
 export * from './diary.js';
 export * from './leader.js';
 export * from './translate.js';
+export * from './names.js';
 
 /** Header that must carry the session's CSRF token on every request that changes something. */
 export const CSRF_HEADER = 'x-csrf-token';

@@ -4,7 +4,7 @@
  */
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { MeResponse } from '@diary/shared';
+import { personName, type MeResponse } from '@diary/shared';
 import { api } from '../../api/client.js';
 import { SESSION_KEY, sessionFromMe, useMe, type Session } from '../../api/session.js';
 import { Button } from '../../components/Button.js';
@@ -16,10 +16,9 @@ import { FONT_SIZES, type Appearance, type FontSize, type Theme } from '../../li
 import { useLogout } from './useLogout.js';
 import styles from './AccountScreen.module.css';
 
-/** "陳明德" from the profile, or the username when no name is set. */
+/** The name from the profile (written as `personName` says), or the username when none is set. */
 export function displayName(me: { username: string; profile: MeResponse['user']['profile'] }) {
-  const name = `${me.profile.familyName}${me.profile.givenName}`.trim();
-  return name || me.username;
+  return personName(me.profile.familyName, me.profile.givenName) || me.username;
 }
 
 export function AccountScreen() {

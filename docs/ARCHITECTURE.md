@@ -586,6 +586,13 @@ states. Each slice is one screen group, with Playwright e2e tests at 360 px and 
 12. **Login, register, forgot password.** *(Done, with the authenticator step and first-time authenticator
     setup for SYS_ADMINs. Registration takes no photo yet; it arrives with the account page in slice 16.)*
 13. **My diary, entry view, editor** (Tiptap, image downscaling, photo and length limits, 提交/更新).
+    *(Done, with 開放日記 (no slice listed it; it reuses the entry view). A new entry is created by its first
+    save, not by 撰寫日記, so an abandoned blank page uses none of the 20 daily creates. Stored HTML is shown
+    through a read-only editor with the same schema, so the browser drops anything outside the allowlist a
+    second time. The CSP now allows inline style attributes (`style-src-attr`) for the font and size spans;
+    `<style>` and scripts stay blocked. Font sizes are `85%`, `1.25em` and `1.5em`, because the sanitiser's
+    pattern rejects `125%`; `web/test/sanitiser-agreement.test.ts` checks every toolbar value against it.
+    Leaders' own diaries use these screens; the leader's review and comment editor are slice 14.)*
 14. **Leader review and open requests.**
 15. **SYS_ADMIN screens**, including Attention and activity.
 16. **報數 and account.**

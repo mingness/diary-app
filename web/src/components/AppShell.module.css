@@ -73,6 +73,15 @@
   box-shadow: inset 0 3px 0 var(--primary);
 }
 
+/* Detail screens (editor, entry) replace the phone tab bar with their back button. */
+.navDetail {
+  display: none;
+}
+
+.mainDetail {
+  padding-bottom: var(--space-4);
+}
+
 /* Desktop: the same links move into the top bar. */
 @media (min-width: 1024px) {
   .header {
@@ -84,7 +93,9 @@
     margin-right: var(--space-5);
   }
 
-  .nav {
+  .nav,
+  .navDetail {
+    display: block;
     position: static;
     margin-right: auto;
     background: none;
@@ -99,6 +110,7 @@
   .tab {
     flex-direction: row;
     gap: var(--space-2);
+    white-space: nowrap;
     min-height: var(--touch);
     padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-input);

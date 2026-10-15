@@ -84,6 +84,11 @@ Keep this file up to date when commands, conventions or pitfalls change.
   never logged. Caps come from `shared/src/limits.ts`; the levels that only warn a SYS_ADMIN from
   `shared/src/warning-levels.ts`. Limits exist to spot misuse, keep leaders' reading load manageable and keep
   entries lean; keep all three in mind when changing one.
+- **Editor schema = sanitiser allowlist.** `web/src/screens/diary/schema.ts` (Tiptap) and
+  `server/src/domain/diary/sanitize.ts` must allow exactly the same tags, attributes and style values; change
+  them together. A value the sanitiser doesn't match is dropped silently on save, so
+  `web/test/sanitiser-agreement.test.ts` checks every toolbar choice against it, and an e2e test reopens a
+  formatted entry and compares the HTML.
 - **The diary keyring** is only for `server/src/services/diary/`; lint enforces it (tested in
   `server/test/unit/lint-rules.test.ts`). Never work around the rule.
 - **Activity events:** record them with `recordActivity`/`recordLogin` wrapped in `safely(...)` so a logging

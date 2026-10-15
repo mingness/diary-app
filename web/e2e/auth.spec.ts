@@ -19,11 +19,13 @@ test('signing in lands in the app, survives a reload, and signing out returns to
   await expect(page).toHaveURL(/\/login$/);
   await signIn(page, t, user);
 
-  await expect(page.getByRole('heading', { name: t('account.appearance') })).toBeVisible();
+  // 報數 is the default destination; until its screen exists (slice 16) users land on their diary.
+  await expect(page.getByRole('heading', { name: t('diary.title') })).toBeVisible();
   await expect(page.getByRole('navigation', { name: t('nav.label') })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('heading', { name: t('account.appearance') })).toBeVisible();
+  await expect(page.getByRole('heading', { name: t('diary.title') })).toBeVisible();
 
+  await page.getByRole('link', { name: t('nav.me'), exact: true }).click();
   await page.getByRole('button', { name: t('account.logout') }).click();
   await expect(page).toHaveURL(/\/login$/);
   // The old session is gone on the server too, not just forgotten by the page.
@@ -131,6 +133,7 @@ test.describe('one project only (the server allows few of these per hour)', () =
     await page.getByLabel(t('auth.password'), { exact: true }).fill('long-enough-pass');
     await page.getByLabel(t('auth.captchaAnswer')).fill('3');
     await page.getByRole('button', { name: t('auth.login'), exact: true }).click();
+    await page.getByRole('link', { name: t('nav.me'), exact: true }).click();
     await expect(page.getByText('測試', { exact: true })).toBeVisible();
   });
 

@@ -17,6 +17,11 @@ const PATHS = {
   logout: 'M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10',
   back: 'M15 5l-7 7 7 7',
   shield: 'M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6l-8-3Z',
+  pen: 'M4 20h4L19 9l-4-4L4 16v4Zm9-13 4 4',
+  book: 'M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5Zm0 16a2 2 0 0 1 2-2h13',
+  bookOpen: 'M12 6c-2-1.5-5-2-8-2v14c3 0 6 .5 8 2 2-1.5 5-2 8-2V4c-3 0-6 .5-8 2Zm0 0v14',
+  image: 'M4 5h16v14H4V5Zm0 10 4-4 4 4 3-3 5 5M15 9h.01',
+  history: 'M3 12a9 9 0 1 0 3-6.7M3 4v4h4M12 7v5l3 2',
 } as const;
 
 export type IconName = keyof typeof PATHS;

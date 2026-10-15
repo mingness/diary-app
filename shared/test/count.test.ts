@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DAILY_COUNT_MAX, DailyCount, normaliseDailyCount } from '../src/count.js';
+import {
+  countDateChoices,
+  DAILY_COUNT_MAX,
+  DailyCount,
+  normaliseDailyCount,
+} from '../src/count.js';
 
 describe('normaliseDailyCount', () => {
   it.each([
@@ -53,4 +58,25 @@ describe('DailyCount (API schema)', () => {
   it.each([0, 1081, -1, 1.5, Number.NaN, '108'])('rejects %j', (n) =>
     expect(DailyCount.safeParse(n).success).toBe(false),
   );
+});
+
+describe('countDateChoices (spec §7.2, D23)', () => {
+  it('is today and the 5 days before, newest first, across a month and a year', () => {
+    expect(countDateChoices('2027-01-03', 5)).toEqual([
+      '2027-01-03',
+      '2027-01-02',
+      '2027-01-01',
+      '2026-12-31',
+      '2026-12-30',
+      '2026-12-29',
+    ]);
+  });
+
+  it('crosses a leap day', () => {
+    expect(countDateChoices('2028-03-01', 1)).toEqual(['2028-03-01', '2028-02-29']);
+  });
+
+  it.each(['2026-02-30', '2026-10', 'today'])('refuses %s', (today) => {
+    expect(() => countDateChoices(today, 5)).toThrow(RangeError);
+  });
 });

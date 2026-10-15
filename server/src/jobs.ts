@@ -1,8 +1,10 @@
-/** The scheduled jobs this server runs (docs/ARCHITECTURE.md §8.9; the 報數 job joins in slice 9). */
+/** The scheduled jobs this server runs (docs/ARCHITECTURE.md §8.5, §8.9). */
 import { and, isNotNull, lt, or } from 'drizzle-orm';
 import type { AppContext } from './context.js';
 import { activityEvents, captchas, readAudit, sessions } from './db/schema.js';
 import { sendDailySummary, sendPendingAlertEmails } from './services/alerts.js';
+import { AUTO_SUBMIT_JOB, runAutoSubmit } from './services/count.js';
+import { AUTO_SUBMIT_HOUR_BEIJING } from './domain/count/schedule.js';
 import type { Job } from './scheduler.js';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -44,7 +46,16 @@ export async function purgeExpired(ctx: AppContext): Promise<Record<string, numb
   };
 }
 
+/** 報數 auto-submit at 02:00 Beijing (spec §7.3); also run by SYS_ADMINs and the internal endpoint. */
+export const COUNT_AUTO_SUBMIT: Job = {
+  name: AUTO_SUBMIT_JOB,
+  schedule: { dailyAtBeijingHour: AUTO_SUBMIT_HOUR_BEIJING },
+  recordRuns: true,
+  run: runAutoSubmit,
+};
+
 export const JOBS: readonly Job[] = [
+  COUNT_AUTO_SUBMIT,
   {
     name: 'alert-emails',
     schedule: { everyMs: 60 * 1000 },

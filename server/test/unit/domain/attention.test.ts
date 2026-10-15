@@ -7,8 +7,8 @@ import {
 } from '../../../src/domain/limits/attention.js';
 
 describe('attention rules', () => {
-  it.each(['create', 'submit', 'update'])(
-    'reaching the daily %s cap flags the account',
+  it.each(['create', 'submit', 'update', 'count'])(
+    'reaching the %s cap flags the account',
     (limit) => {
       expect(triggeredRule('limit_reached', 1, limit)).toBe('limit_reached');
     },

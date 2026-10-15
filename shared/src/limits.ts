@@ -32,6 +32,14 @@ export const ENTRY_LIMITS = {
   titleChars: 100,
 } as const;
 
+/** 報數 (spec §7.2, D23). */
+export const COUNT_LIMITS = {
+  /** Manual entries per user per count date; the nightly auto entry doesn't count toward it. */
+  manualPerCountDate: 10,
+  /** A count may be reported for today or up to this many days earlier (Beijing dates); never the future. */
+  backdateDays: 5,
+} as const;
+
 /** History versions kept per entry (spec §5.2). */
 export const MAX_VERSIONS = 3;
 
@@ -44,7 +52,16 @@ export function visibleCharCount(text: string): number {
   return [...text.replace(/\s+/gu, '')].length;
 }
 
-export type LimitName = DailyLimitKind | 'images' | 'chars';
+export type LimitName = DailyLimitKind | 'images' | 'chars' | 'count';
+
+/**
+ * The caps that flag the account when reached: volume caps, which honest users don't meet. The per-entry
+ * limits (photos, characters) are refused kindly but don't flag (D28).
+ */
+export const FLAGGING_LIMITS: ReadonlySet<LimitName> = new Set([
+  ...(Object.keys(DAILY_LIMITS) as DailyLimitKind[]),
+  'count',
+]);
 
 /** The daily counters kept per user (`daily_usage`): the capped kinds, plus comments, which only warn. */
 export type UsageKind = DailyLimitKind | 'comment';

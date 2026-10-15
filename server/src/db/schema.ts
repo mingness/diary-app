@@ -341,3 +341,45 @@ export const readAudit = pgTable(
     index('read_audit_read_at_idx').on(t.readAt),
   ],
 );
+
+// ---------------------------------------------------------------------------------------------------------
+// 報數 (spec §7, docs/ARCHITECTURE.md §8.5). One app-wide total; no content, so nothing here is encrypted.
+
+export const countEntries = pgTable(
+  'count_entries',
+  {
+    id: uuid('id').primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    dailyCount: integer('daily_count').notNull(),
+    /** The Beijing date the count is for: today or up to 5 days earlier (D23). */
+    countDate: date('count_date', { mode: 'string' }).notNull(),
+    submittedAt: timestamptz('submitted_at').notNull(),
+    /** Made by the 02:00 job rather than the user. */
+    auto: boolean('auto').notNull(),
+  },
+  (t) => [
+    check('count_entries_daily_count_range', sql`${t.dailyCount} BETWEEN 1 AND 1080`),
+    index('count_entries_user_date_idx').on(t.userId, t.countDate),
+    index('count_entries_date_idx').on(t.countDate),
+    // At most one auto entry per user per date, so running the job twice in a day changes nothing.
+    uniqueIndex('count_entries_one_auto_key')
+      .on(t.userId, t.countDate)
+      .where(sql`${t.auto}`),
+  ],
+);
+
+export const countSettings = pgTable(
+  'count_settings',
+  {
+    userId: uuid('user_id')
+      .primaryKey()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    autoSubmit: boolean('auto_submit').notNull().default(false),
+    /** The number the 02:00 job submits; 0 until the user has typed one. */
+    savedCount: integer('saved_count').notNull().default(0),
+    updatedAt: timestamptz('updated_at').notNull(),
+  },
+  (t) => [check('count_settings_saved_count_range', sql`${t.savedCount} BETWEEN 0 AND 1080`)],
+);

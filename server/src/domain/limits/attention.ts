@@ -4,11 +4,12 @@
  * thresholds live in `shared/src/warning-levels.ts`.
  */
 import {
-  DAILY_LIMITS,
+  FLAGGING_LIMITS,
   LOGIN_FAILURE_WARNING,
   NEW_DEVICE_WARNING,
   type ActivityKind,
   type AlertRule,
+  type LimitName,
 } from '@diary/shared';
 
 export type { ActivityKind, AlertRule };
@@ -27,9 +28,9 @@ export function windowFor(kind: ActivityKind): number | null {
 
 /**
  * Which rule, if any, a new event triggers. `recentCount` is the number of events of the same kind for the
- * same user within `windowFor(kind)`, including this one. For `limit_reached`, `limit` says which: only daily
- * caps flag the account. Honest writers meet the per-entry limits (length, photos) all the time, so those are
- * refused kindly but not flagged.
+ * same user within `windowFor(kind)`, including this one. For `limit_reached`, `limit` says which: only the
+ * volume caps (daily, and 報數 per count date) flag the account. Honest writers meet the per-entry limits
+ * (length, photos) all the time, so those are refused kindly but not flagged.
  */
 export function triggeredRule(
   kind: ActivityKind,
@@ -37,7 +38,7 @@ export function triggeredRule(
   limit?: string,
 ): AlertRule | null {
   if (kind === 'limit_reached') {
-    return limit !== undefined && Object.hasOwn(DAILY_LIMITS, limit) ? 'limit_reached' : null;
+    return limit !== undefined && FLAGGING_LIMITS.has(limit as LimitName) ? 'limit_reached' : null;
   }
   if (kind === 'elevated_activity') return 'elevated_activity';
   if (kind === 'login_failed' && recentCount >= LOGIN_FAILURE_WARNING.count)

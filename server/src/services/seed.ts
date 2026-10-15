@@ -14,6 +14,7 @@ import { AdminToolError, enableTotp } from './admin-tools.js';
 import { saveMyComment } from './diary/comments.js';
 import { createDocument, saveDraft, submitDocument } from './diary/documents.js';
 import { changeAccess } from './sharing.js';
+import { submitCount, updateCountSettings } from './count.js';
 import { createUser, type UserRow } from './users.js';
 
 export const SEED_PASSWORD = 'password123';
@@ -164,6 +165,16 @@ function seededLeader(created: ReadonlyMap<string, UserRow>, username: string): 
   return leader;
 }
 
+/** 報數 over the past week: [username, counts for 6 days ago … today (0: none), auto-submit]. */
+export const SEED_COUNTS: readonly [string, readonly number[], boolean][] = [
+  ['chenmd', [108, 108, 216, 108, 0, 108, 108], true],
+  ['zhangsf', [540, 0, 0, 1080, 540, 540, 0], true],
+  ['wangdt', [0, 0, 27, 54, 108, 0, 216], false],
+  ['wuml', [1080, 1080, 1080, 1080, 1080, 1080, 1080], false],
+  ['linjy', [0, 0, 0, 0, 0, 21, 0], false],
+  ['leader.lin', [108, 108, 108, 108, 108, 108, 108], true],
+];
+
 export interface SeedResult {
   readonly users: { username: string; role: Role; totpSecret?: string; resetPending: boolean }[];
   readonly entries: number;
@@ -243,6 +254,18 @@ export async function seed(ctx: AppContext, options: { reset: boolean }): Promis
         state: comment.state,
       });
     }
+  }
+
+  for (const [username, counts, autoSubmit] of SEED_COUNTS) {
+    const user = created.get(username);
+    if (!user) throw new Error(`seed counts for unknown user ${username}`);
+    for (const [i, count] of counts.entries()) {
+      if (count === 0) continue;
+      // Submitted on the day, for that day.
+      const at = new Date(now - (counts.length - 1 - i) * 86_400_000);
+      await submitCount({ ...ctx, clock: () => at }, user.id, { count });
+    }
+    await updateCountSettings(ctx, user.id, { autoSubmit });
   }
   return { users: result, entries: SEED_ENTRIES.length };
 }

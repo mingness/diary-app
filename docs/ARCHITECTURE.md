@@ -397,16 +397,19 @@ traditional characters throughout (F5); no offline writing in v1 (F6).
 ### 8.5 报数
 
 - App-wide: one shared total (agreed).
-- `domain/count/input.ts` trims non-digits and clamps to 1–1080, returning notices. The same function runs in
+- `normaliseDailyCount` in `shared/src/count.ts` trims non-digits and clamps to 1–1080, returning notices. The same function runs in
   the client (UX) and the server (enforcement), and DB CHECKs are the backstop.
-- **Count date (D23):** today or up to 5 days earlier (Asia/Shanghai), checked in `domain/count`; never in the
-  future. Manual entries are limited to 10 per user per `count_date` (the auto entry is exempt), so backdating
+- **Count date (D23):** today or up to 5 days earlier (Asia/Shanghai), from `countDateChoices` in
+  `shared/src/count.ts` (the summary returns the allowed dates for the chips); never in the future. Manual entries are limited to 10 per user per `count_date` (the auto entry is exempt), so backdating
   can't multiply the limit. Auto-submit always uses today. "Today's count" and "first count date" use
   `count_date`.
 - SYS_ADMINs can delete a user's count entries by `count_date` range, so cleaning up after a hijacked account
   keeps the user's honest history.
 - The scheduler fires at 02:00 Asia/Shanghai using an injected clock and `pg_try_advisory_lock`, and records a
-  `job_runs` row. A missed or failed run shows a banner to SYS_ADMINs.
+  `job_runs` row. A missed or failed run shows a banner to SYS_ADMINs: the latest run failed, or no run
+  succeeded within 15 minutes of the last 02:00. A manual entry also becomes the user's saved number.
+- `POST /internal/count/auto-run` (Bearer `CRON_SECRET`, compared in constant time) runs the same job for an
+  external cron. The proxy must not route `/internal/` from the internet (Phase C).
 
 ### 8.6 Translation (§8)
 
@@ -546,7 +549,9 @@ its entries in the API explorer (D20), so it can be checked by hand before any s
    `wrong_password` (403, not 401, so the app doesn't treat it as signed out) and counts toward the same
    per-username throttle as sign-in.)*
 9. **報數 API:** summary, latest, settings, count date and per-date limit, admin list, delete by date range,
-   scheduler, job runs.
+   scheduler, job runs. *(Done. One auto entry per user per date, enforced by a unique index, so running the
+   job again the same day changes nothing. Only manual entries are `count_entry` activity. Reaching the
+   per-date cap flags the account like the daily caps.)*
 10. **Translation API** (faked in tests).
 
 ### Phase B: frontend, iteratively, against seeded data
@@ -599,4 +604,5 @@ Each slice ships with tests, both languages where it has UI, permission tests pe
 | D26 | Spotting odd behaviour | **Agreed**: metadata-only activity log (90 days), Attention list with simple rules, sign-out-all, lock, delete counts by date range. §8.9 |
 | D27 | Alerting SYS_ADMINs | **Agreed**: in-app Attention list always; email via SMTP (`nodemailer`, approved) from a QQ/163 mailbox when `SMTP_URL` is set. Web Push rejected: Android push is blocked in mainland China |
 | D28 | Warning levels separate from caps | **Agreed**: limits exist to spot misuse, keep leaders' reading load manageable and keep entries lean. Caps refuse; warning levels (about half the caps, plus 40 submitted comments a day) only flag the account, once a day. Per-entry refusals no longer flag. Comments have the entry's per-entry limits. §8.3, §8.9 |
+| Q1 | SYS_ADMIN resetting their own authenticator (spec §4.4 "set up / reset") | **Deferred** (2026-10-15). Today another SYS_ADMIN or the CLI resets it |
 | F1–F6 | Frontend decisions | **Agreed**: see FRONTEND.md §11 |

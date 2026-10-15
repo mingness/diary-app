@@ -24,7 +24,7 @@ Keep this file up to date when commands, conventions or pitfalls change.
 | Functional tests (live stack, real config; local only) | `npm run test:functional` after `docker compose restart server`; see `server/test/functional/README.md`                |
 | End-to-end tests (browser; local only)                 | `npm run test:e2e` (starts and reseeds its own stack on :8081; `npm run e2e:down` removes it); see `web/e2e/README.md` |
 | Sample users and entries (dev; wipes)                  | `npm run seed -- --reset` (every password is `password123`; admins' authenticator keys are printed)                    |
-| Current code for a seeded admin's authenticator key    | `npm run cli -w server -- totp-code <key>`                                                                             |
+| Current code for a seeded admin's authenticator key    | `npm run cli -w server -- totp-code <key>` (only needed with `SKIP_TOTP=false`; dev skips the code)                    |
 | First admin / recovery (production, in the container)  | `node server/dist/cli.js create-sysadmin <name>` · `set-password <name>` · `reset-totp <name>`                         |
 | New migration after editing `server/src/db/schema.ts`  | `npm run db:generate -w server`, then review the SQL                                                                   |
 | Stop the database                                      | `npm run db:down` (add `-v` to `docker compose down` to wipe data)                                                     |
@@ -112,7 +112,9 @@ Keep this file up to date when commands, conventions or pitfalls change.
   an axe check in both themes in `web/e2e/` and works at 360 px and 22 px text.
 - **E2E tests** read strings from the app's own tables via the `t` fixture, so one test covers both
   languages. Each project has a seeded user (`userPage`) and a course leader (`leaderPage`); two projects
-  share each leader, so a leader test works on an entry its own student just created through the API. The stack's per-IP limits are real: sign in through the saved sessions (`userPage`) rather than
+  share each leader, so a leader test works on an entry its own student just created through the API. All
+  projects share one SYS_ADMIN session (`adminPage`, `admin2`), signed in once with its authenticator code: a
+  code can't be used twice, so admin tests never sign in through the form (only `auth.spec` does, as `admin`). The stack's per-IP limits are real: sign in through the saved sessions (`userPage`) rather than
   the form where the form isn't the point, and run register/forgot-password/admin flows in one project.
 - **Comments** explain why, not what. Public functions get a doc comment.
 - **Commits:** Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`).

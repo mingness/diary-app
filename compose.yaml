@@ -27,6 +27,8 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgres://diary:${POSTGRES_PASSWORD}@db:5432/diary
+      # From .env, but overridable per project: the e2e stack forces it off (web/e2e/stack.env).
+      SKIP_TOTP: ${SKIP_TOTP:-false}
       HOST: 0.0.0.0
       PORT: '3000'
     depends_on:

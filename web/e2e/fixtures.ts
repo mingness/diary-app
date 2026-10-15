@@ -40,6 +40,8 @@ interface Fixtures {
   userPage: Page;
   /** A page already signed in as the project's course leader. */
   leaderPage: Page;
+  /** A page already signed in as a SYS_ADMIN (shared by every project). */
+  adminPage: Page;
 }
 
 export const test = base.extend<E2eOptions & Fixtures>({
@@ -68,6 +70,13 @@ export const test = base.extend<E2eOptions & Fixtures>({
 
   leaderPage: async ({ browser, lang, leader }, use) => {
     const page = await signedInPage(browser, lang, leader);
+    await use(page);
+    await page.context().close();
+  },
+
+  adminPage: async ({ browser, lang }, use) => {
+    // Matches SESSION_ADMIN in global-setup.ts.
+    const page = await signedInPage(browser, lang, 'admin2');
     await use(page);
     await page.context().close();
   },

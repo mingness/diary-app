@@ -70,7 +70,7 @@ just hue.
 |---|---|---|
 | NORMAL_USER | 日記 · 開放日記 · 報數 · 我的 | same four, as top links |
 | COURSE_LEADER | 批閱 (badge: share requests) · 日記 · 開放日記 · 報數 · 我的 | 批閱 (badge) · 我的日記 · 開放日記 · 報數 · 我的 |
-| SYS_ADMIN | 用戶 (badge) · 日記 · 報數 · 重設 (badge) · 我的 | 注意 (badge) · 用戶 · 日記管理 · 報數管理 · 密碼重設 (badge) · username |
+| SYS_ADMIN | 注意 (badge) · 用戶 (badge) · 日記 · 報數 · 我的 | 注意 (badge) · 用戶 (badge) · 日記管理 · 報數管理 · 我的 |
 
 - The tab bar replaces the spec's My Diary / Open Diary toggle and its scattered header buttons (§6.2, §7.4).
   "Go Diary" from the count page is simply the 日記 tab.
@@ -213,24 +213,27 @@ its 已開放 chip with a small 取消開放 beside it.
   otherLeaderCommented, unread, access`; `GET leader/users?month=` → names + counts; `GET leader/open-requests`;
   `GET documents/:id` per entry as it loads; `PUT comments/mine`; `POST access approve|decline|revoke`.
 
-### 4.8 SYS_ADMIN (desktop first)
+### 4.8 SYS_ADMIN (desktop first; revised 2026-10-15)
 
-- **注意 (Attention):** on desktop its own top-bar item; on phones the top of the 用戶 tab (the tab carries
-  the badge). Unhandled flags, newest first: username, rule ("已達每日提交上限", "多次登入失敗", "一天內多個新裝置"),
-  time, and actions 查看活動 / 登出所有裝置 / 鎖定帳戶 (confirm) / 已處理. A status line shows whether email
-  alerts are on ("電郵通知：未設定" or the recipient count and last send).
-- **Activity:** per user, a 7-day summary (entries, submissions, updates, count entries, storage) and the event
-  list. Metadata only.
-- **用戶:** search with `?` / `*`, a role filter, and a table (checkbox, username, name, role chip, status
-  including "等待重設密碼" and "已啟用驗證器", storage used, created date, 編輯 / 刪除). Batch delete applies to selected
-  normal users only. Side cards show pending resets and the last auto-submit run.
-- **新增 / 編輯用戶:** role, email, names, address, photo, and an optional new password (generated passwords are
-  shown once in a dialog with a copy button).
-- **日記管理:** search by username and/or date; the table shows title, date, owner and state; delete with confirm.
-- **報數管理:** all users, an auto-submit toggle per row, delete entries per row (all, or a count-date range;
-  confirm), job-run history,
-  and 立即執行.
-- **密碼重設:** the pending list. Each row has 產生 (an 8-character password shown once) or a typed password.
+- **注意 (Attention):** its own tab with the open-flag count as its badge. Flags newest first (待處理 /
+  已處理 / 全部): username, rule ("已達每日上限", "活動異常頻繁", "多次登入失敗", "一天內多個新裝置"), time, email
+  state, and 查看活動 / 登出所有裝置 (confirm) / 鎖定帳戶 (confirm) / 已處理. A status line says whether email
+  alerts are on ("電郵通知：未設定" or the recipient count, last send and failures). Below, the **activity
+  summary**: per user, today or the last 7 days (entries, submissions, updates, counts) and storage, sortable.
+- **Activity:** one user's events (from a flag or the summary) or everyone's, filterable by event, paged;
+  times and events only (e.g. "上限：首次提交", "密碼錯誤", the device name).
+- **用戶:** search with `?` / `*`, a role filter, and 全部用戶 / **等待重設 (n)**: password resets are a filter
+  here, answered on the row with 設定密碼, not a tab of their own (the tab's badge counts them). Table:
+  checkbox (students only, never yourself), username, name, role, status chips (等待重設密碼, 已啟用驗證器),
+  storage, created, 編輯 / 刪除 (confirm). Batch delete applies to selected students.
+- **新增 / 編輯用戶:** role, email, names, address, photo (cropped and resized to 300 × 300 in the browser).
+  A new account's password is generated (8 characters, shown once in a dialog with a copy button, before
+  anything else happens) or typed. An existing account has **帳戶安全** (設定密碼, 移除驗證器, 登出所有裝置,
+  鎖定帳戶) and **刪除帳戶**; the actions on your own account that the server refuses aren't offered.
+- **日記管理:** search by username and/or date; the table shows title, date, author and state; delete with
+  confirm. Metadata only.
+- **報數管理** (slice 16): all users, an auto-submit toggle per row, delete entries per row (all, or a count-date
+  range; confirm), job-run history and 立即執行.
 - **API:** as in ARCHITECTURE §7.3. User rows need `role, status, totpEnabled, storageBytes, createdAt`.
 
 ## 5. Components

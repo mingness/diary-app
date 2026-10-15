@@ -186,6 +186,18 @@ describe('loadConfig', () => {
     });
   });
 
+  describe('SKIP_TOTP', () => {
+    it('is off unless asked for', () => {
+      expect(loadConfig(validEnv()).skipTotp).toBe(false);
+      expect(loadConfig(validEnv({ SKIP_TOTP: 'true' })).skipTotp).toBe(true);
+    });
+
+    it('is refused in production, by name, so administrators always need their authenticator there', () => {
+      const err = configErrorFor(validEnv({ NODE_ENV: 'production', SKIP_TOTP: 'true' }));
+      expect(err.invalidVariables).toEqual(['SKIP_TOTP']);
+    });
+  });
+
   describe('API_DOCS', () => {
     it('defaults to on outside production and off in production', () => {
       expect(loadConfig(validEnv()).apiDocs).toBe(true);

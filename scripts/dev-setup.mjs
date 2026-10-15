@@ -24,6 +24,8 @@ const generated = {
   CRON_SECRET: hex(32),
   // Convenient for trying the API by hand; set to false to see real CAPTCHAs.
   CAPTCHA_FIXED: 'true',
+  // Admins sign in without an authenticator code in development; set to false to use it.
+  SKIP_TOTP: 'true',
 };
 
 const lines = readFileSync(template, 'utf8')

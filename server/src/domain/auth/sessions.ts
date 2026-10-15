@@ -34,7 +34,9 @@ export function expiryFrom(now: Date, kind: SessionKind, role: Role, mfa: MfaSta
 }
 
 /** The second-factor state a fresh login starts in. */
-export function initialMfaState(role: Role, totpEnabled: boolean): MfaState {
+export function initialMfaState(role: Role, totpEnabled: boolean, skipTotp = false): MfaState {
+  // SKIP_TOTP: development only (config refuses it in production), so admins sign in with a password.
+  if (skipTotp) return 'not_required';
   if (totpEnabled) return 'pending';
   return role === 'SYS_ADMIN' ? 'enrolment_required' : 'not_required';
 }

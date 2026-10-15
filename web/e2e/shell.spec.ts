@@ -80,7 +80,9 @@ test('text size and theme are saved to the account and applied at once', async (
   await expect(html).toHaveAttribute('data-theme', 'dark');
   await expectNoSidewaysScroll(userPage);
 
-  // Stored on the server: a device with nothing cached gets them back after sign-in.
+  // Stored on the server: a device with nothing cached gets them back after sign-in. The two saves run one
+  // after the other, so wait for them to finish before reloading.
+  await userPage.waitForLoadState('networkidle');
   await userPage.evaluate(() => localStorage.clear());
   await userPage.reload();
   await expect(html).toHaveCSS('font-size', '22px');

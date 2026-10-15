@@ -86,15 +86,16 @@ function ForRoles({ roles }: { roles: readonly Role[] }) {
   return roles.includes(me.role) ? <Outlet /> : <NotFound />;
 }
 
-/** Until 報數 (slice 16) and the admin home (slice 15) exist, land on each role's home. */
+/** Until 報數 (slice 16) exists, its landing goes to each role's home. */
 function NotYetBuilt() {
   const me = useMe();
-  const home = { NORMAL_USER: '/diary', COURSE_LEADER: '/review', SYS_ADMIN: '/me' } as const;
+  const home = { NORMAL_USER: '/diary', COURSE_LEADER: '/review', SYS_ADMIN: '/admin' } as const;
   return <Navigate to={home[me.role]} replace />;
 }
 
 const WRITERS: readonly Role[] = ['NORMAL_USER', 'COURSE_LEADER'];
 const LEADERS: readonly Role[] = ['COURSE_LEADER'];
+const ADMINS: readonly Role[] = ['SYS_ADMIN'];
 
 /** Detail screens hide the phone tab bar and show a back button instead (FRONTEND.md §3). */
 const detail = { handle: { detail: true } };
@@ -132,6 +133,45 @@ const reviewRoutes: RouteObject[] = [
     ...wide,
     lazy: async () => ({
       Component: (await import('./screens/review/ReviewScreen.js')).ReviewScreen,
+    }),
+  },
+];
+
+// SYS_ADMIN screens: accounts and metadata only, never diary content (spec §1).
+const adminRoutes: RouteObject[] = [
+  { path: '/admin', element: <Navigate to="/admin/attention" replace /> },
+  {
+    path: '/admin/attention',
+    lazy: async () => ({
+      Component: (await import('./screens/admin/AttentionScreen.js')).AttentionScreen,
+    }),
+  },
+  {
+    path: '/admin/activity',
+    ...wide,
+    lazy: async () => ({
+      Component: (await import('./screens/admin/ActivityScreen.js')).ActivityScreen,
+    }),
+  },
+  {
+    path: '/admin/users',
+    ...wide,
+    lazy: async () => ({
+      Component: (await import('./screens/admin/UsersScreen.js')).UsersScreen,
+    }),
+  },
+  {
+    path: '/admin/users/:id',
+    ...detail,
+    lazy: async () => ({
+      Component: (await import('./screens/admin/UserFormScreen.js')).UserFormScreen,
+    }),
+  },
+  {
+    path: '/admin/documents',
+    ...wide,
+    lazy: async () => ({
+      Component: (await import('./screens/admin/DocumentsScreen.js')).DocumentsScreen,
     }),
   },
 ];
@@ -195,8 +235,9 @@ const router = createBrowserRouter([
           { path: '/me', element: <AccountScreen /> },
           { element: <ForRoles roles={WRITERS} />, children: diaryRoutes },
           { element: <ForRoles roles={LEADERS} />, children: reviewRoutes },
+          { element: <ForRoles roles={ADMINS} />, children: adminRoutes },
           // Landing destinations whose screens arrive in later slices (ARCHITECTURE §11).
-          ...['/count', '/admin'].map((path) => ({ path, element: <NotYetBuilt /> })),
+          { path: '/count', element: <NotYetBuilt /> },
           { path: '*', element: <NotFound /> },
         ],
       },

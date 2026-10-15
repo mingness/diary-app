@@ -339,6 +339,9 @@ for any submitted entry, their own included, and the review lists include their 
   - Signing in replaces any session the browser already had (prevents session fixation).
 - **TOTP:** required for SYS_ADMIN, enrolled on first login (or through the CLI for the first admin); optional
   for others. Recovery is another SYS_ADMIN resetting it, or the CLI for the last admin.
+  - `SKIP_TOTP=true` (development only, written by `dev-setup`; the server refuses to start with it in
+    production) skips the code at sign-in, so admins use a password alone locally. The e2e stack forces it
+    off, so the browser tests still go through the authenticator (agreed 2026-10-15).
   - Password changes and resets revoke all the user's sessions except the current one. Changing one's own
     password needs the current one; wrong guesses share the sign-in throttle, so a stolen session can't be
     used to guess it.
@@ -607,7 +610,11 @@ states. Each slice is one screen group, with Playwright e2e tests at 360 px and 
     leaders got 未讀 (`?unread=true`, from the read audit). Finally (agreed 2026-10-15, "fewest clicks"):
     every list is a continuous feed; 開放申請 became a filter of the one 批閱 tab; no page per entry and no
     one-at-a-time view, so the stepper and reading pane are gone.)*
-15. **SYS_ADMIN screens**, including Attention and activity.
+15. **SYS_ADMIN screens**, including Attention and activity. *(Done, except 報數管理, which comes with 報數 in
+    slice 16. Password resets became a filter of 用戶 (the 等待重設 count is its tab's badge) rather than a tab.
+    Tabs: 注意 · 用戶 · 日記管理 · 我的. The e2e setup signs in one SYS_ADMIN (`admin2`, with its
+    authenticator code) shared by every project; `admin` stays for the sign-in form test, since a code can't
+    be used twice.)*
 16. **報數 and account.**
 17. **Installable web app:** manifest, service worker, update toast, install help. Then the phone check for D10.
 

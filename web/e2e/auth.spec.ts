@@ -70,26 +70,24 @@ test.describe('administrators', () => {
 
     await page.getByLabel(t('totp.code')).fill(codeFor(seedInfo().totpKeys.admin!));
     await page.getByRole('button', { name: t('totp.submit') }).click();
-    await expect(page.getByRole('heading', { name: t('account.appearance') })).toBeVisible();
+    await expect(page.getByRole('heading', { name: t('attention.title') })).toBeVisible();
   });
 
-  test('a new SYS_ADMIN must set up an authenticator before anything else', async ({ page, t }) => {
-    // admin2 creates the new administrator through the API, as the user screens will in slice 15.
-    await page.goto('/login');
-    await signIn(page, t, 'admin2');
-    await page.getByLabel(t('totp.code')).fill(codeFor(seedInfo().totpKeys.admin2!));
-    await page.getByRole('button', { name: t('totp.submit') }).click();
-    await expect(page.getByRole('heading', { name: t('account.appearance') })).toBeVisible();
-
-    const me = await (await page.request.get('/api/me')).json();
+  test('a new SYS_ADMIN must set up an authenticator before anything else', async ({
+    page,
+    adminPage,
+    t,
+  }) => {
+    // Another administrator (the shared session) creates the account through the API.
+    const me = await (await adminPage.request.get('/api/me')).json();
     const username = unusedUsername('admin');
-    const created = await page.request.post('/api/admin/users', {
+    const created = await adminPage.request.post('/api/admin/users', {
       headers: { 'x-csrf-token': me.csrfToken },
       data: { username, role: 'SYS_ADMIN', credentials: { password: 'new-admin-pass' } },
     });
     expect(created.ok()).toBe(true);
-    await page.getByRole('button', { name: t('account.logout') }).click();
 
+    await page.goto('/login');
     await signIn(page, t, username, 'new-admin-pass');
     await expect(page.getByRole('heading', { name: t('enrol.title') })).toBeVisible();
     // Nothing else is reachable until the authenticator is confirmed.
@@ -99,6 +97,7 @@ test.describe('administrators', () => {
     const secret = (await page.getByText(/^[A-Z2-7]{16,}$/).textContent()) ?? '';
     await page.getByLabel(t('totp.code')).fill(codeFor(secret));
     await page.getByRole('button', { name: t('enrol.submit') }).click();
+    // Set up: the page asked for (/me) now opens.
     await expect(page.getByRole('heading', { name: t('account.appearance') })).toBeVisible();
   });
 });

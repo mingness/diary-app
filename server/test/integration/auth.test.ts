@@ -469,3 +469,51 @@ describe('logs', () => {
     expect(all).not.toMatch(/sid=[A-Za-z0-9_-]{20,}/);
   });
 });
+
+describe('SKIP_TOTP (development only)', () => {
+  let dev: TestApp;
+  beforeAll(async () => {
+    dev = await createTestApp({ env: { SKIP_TOTP: 'true' } });
+  });
+  afterAll(async () => {
+    await dev?.close();
+  });
+
+  const adminList = (app: TestApp, who: { cookie: string; csrf: string }) =>
+    app.app.inject({ method: 'GET', url: '/api/admin/users', headers: as(who) });
+
+  it('lets a SYS_ADMIN in with the password alone, with or without an authenticator', async () => {
+    const withKey = uniqueName('admin');
+    const secret = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
+    await createSysadmin(dev.ctx, {
+      username: withKey,
+      password: TEST_PASSWORD,
+      totpSecret: secret,
+      totpCode: currentTotpCode(secret, dev.clock.now()),
+    });
+    const without = uniqueName('admin');
+    await createUser(dev.ctx, {
+      username: without,
+      password: TEST_PASSWORD,
+      role: 'SYS_ADMIN',
+      profile: EMPTY_PROFILE,
+    });
+    for (const username of [withKey, without]) {
+      expect((await adminList(dev, await login(dev.app, username))).statusCode).toBe(200);
+    }
+  });
+
+  it('is off in the ordinary app: the code is still asked for', async () => {
+    const username = uniqueName('admin');
+    const secret = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
+    await createSysadmin(t.ctx, {
+      username,
+      password: TEST_PASSWORD,
+      totpSecret: secret,
+      totpCode: currentTotpCode(secret, t.clock.now()),
+    });
+    const res = await adminList(t, await login(t.app, username));
+    expect(res.statusCode).toBe(403);
+    expect(ErrorBody.parse(res.json()).code).toBe('totp_required');
+  });
+});

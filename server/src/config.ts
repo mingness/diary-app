@@ -29,6 +29,8 @@ export interface Config {
    * end-to-end tests can sign in. Refused in production.
    */
   readonly captchaFixed: boolean;
+  /** Development only: sign-in never asks for an authenticator code (refused in production). */
+  readonly skipTotp: boolean;
   /**
    * Optional SMTP for admin alert emails, e.g. `smtps://<address>:<authorization code>@smtp.qq.com:465`.
    * A secret (it holds the mailbox's authorization code). Without it, alerts stay in the app only.
@@ -86,6 +88,7 @@ const envSchema = z.object({
   CRON_SECRET: z.string().min(32),
   API_DOCS: z.enum(['true', 'false']).optional(),
   CAPTCHA_FIXED: z.enum(['true', 'false']).default('false'),
+  SKIP_TOTP: z.enum(['true', 'false']).default('false'),
   SMTP_URL: z
     .string()
     .regex(/^smtps?:\/\/\S+$/)
@@ -136,6 +139,8 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
     }
     // A predictable CAPTCHA must never reach real users.
     if (env.CAPTCHA_FIXED === 'true') invalid.add('CAPTCHA_FIXED');
+    // Administrators must always use their authenticator for real.
+    if (env.SKIP_TOTP === 'true') invalid.add('SKIP_TOTP');
     if (env.SMTP_URL && looksLikeDummy(env.SMTP_URL)) invalid.add('SMTP_URL');
   }
 
@@ -174,6 +179,7 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
     cronSecret: e.CRON_SECRET,
     apiDocs: e.API_DOCS === undefined ? e.NODE_ENV !== 'production' : e.API_DOCS === 'true',
     captchaFixed: e.CAPTCHA_FIXED === 'true',
+    skipTotp: e.SKIP_TOTP === 'true',
     smtp: e.SMTP_URL && e.MAIL_FROM ? { url: e.SMTP_URL, from: e.MAIL_FROM } : null,
     translate:
       e.TRANSLATE_API_URL && e.TRANSLATE_API_KEY && e.TRANSLATE_MODEL

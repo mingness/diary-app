@@ -162,7 +162,7 @@ export function authRoutes(
       if (needsRehash(user.passwordHash)) updates.passwordHash = await hashPassword(password);
       await ctx.db.update(users).set(updates).where(eq(users.id, user.id));
 
-      const mfa = initialMfaState(user.role, user.totpEnabledAt !== null);
+      const mfa = initialMfaState(user.role, user.totpEnabledAt !== null, ctx.config.skipTotp);
       const kind = remember ? 'device' : 'browser';
       const { token, session } = await createSession(ctx, user, {
         kind,

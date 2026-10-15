@@ -32,8 +32,9 @@ curl localhost:3000/readyz
 npm run dev:web        # the web app on http://localhost:5173 (forwards /api to :3000)
 ```
 
-Then open http://localhost:5173 and sign in as `chenmd` (a normal user) or `leader.lin`; with
-`CAPTCHA_FIXED=true` (the dev default) the CAPTCHA answer is always 3. http://localhost:3000/docs lets you
+Then open http://localhost:5173 and sign in as `chenmd` (a normal user), `leader.lin` (a leader) or `admin`;
+with the dev defaults the CAPTCHA answer is always 3 (`CAPTCHA_FIXED`) and admins need no authenticator code
+(`SKIP_TOTP`). http://localhost:3000/docs lets you
 browse and try every API endpoint (development and staging only).
 
 Or run everything in containers: `docker compose up -d --wait --build`, then open http://localhost:8080.

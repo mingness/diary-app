@@ -5,6 +5,7 @@
  */
 import type { ReactNode } from 'react';
 import { NavLink, useMatches } from 'react-router';
+import { useAlertStatus, useWaitingResets } from '../api/admin.js';
 import { useOpenRequests } from '../api/leader.js';
 import type { Role } from '@diary/shared';
 import { useI18n, type MessageKey } from '../i18n/index.js';
@@ -20,8 +21,8 @@ interface NavItem {
   icon: IconName;
   /** Only in the desktop top bar; phones keep to four or five tabs. */
   desktopOnly?: boolean;
-  /** Shows how many open requests are waiting. */
-  requestsBadge?: boolean;
+  /** What the badge counts: share requests (leaders), open flags or waiting resets (SYS_ADMINs). */
+  badge?: 'requests' | 'alerts' | 'resets';
 }
 
 // Destinations appear here as their screens are built (docs/ARCHITECTURE.md §11, Phase B).
@@ -32,12 +33,22 @@ const ME: NavItem = { to: '/me', label: 'nav.me', icon: 'user' };
 const NAV: Record<Role, readonly NavItem[]> = {
   NORMAL_USER: [DIARY, OPEN, ME],
   COURSE_LEADER: [
-    { to: '/review', label: 'nav.review', icon: 'review', requestsBadge: true },
+    { to: '/review', label: 'nav.review', icon: 'review', badge: 'requests' },
     { ...DIARY, wideLabel: 'nav.myDiary' },
     OPEN,
     ME,
   ],
-  SYS_ADMIN: [ME],
+  SYS_ADMIN: [
+    { to: '/admin/attention', label: 'nav.attention', icon: 'bell', badge: 'alerts' },
+    { to: '/admin/users', label: 'nav.users', icon: 'users', badge: 'resets' },
+    {
+      to: '/admin/documents',
+      label: 'nav.documents',
+      wideLabel: 'nav.documentsWide',
+      icon: 'book',
+    },
+    ME,
+  ],
 };
 
 function useRouteFlag(flag: 'detail' | 'wide'): boolean {
@@ -46,10 +57,13 @@ function useRouteFlag(flag: 'detail' | 'wide'): boolean {
   );
 }
 
-/** The number of open requests, for leaders' badge; kept fresh by the query's own polling. */
-function RequestsBadge() {
+/** A tab's count, shown as a number with words for screen readers; kept fresh by its query's polling. */
+function Badge({ kind }: { kind: NonNullable<NavItem['badge']> }) {
   const { t } = useI18n();
-  const count = useOpenRequests().data?.documents.length ?? 0;
+  const requests = useOpenRequests(kind === 'requests').data?.documents.length;
+  const alerts = useAlertStatus(kind === 'alerts').data?.openCount;
+  const resets = useWaitingResets(kind === 'resets').data;
+  const count = { requests, alerts, resets }[kind] ?? 0;
   if (count === 0) return null;
   return (
     <span className={styles.badge}>
@@ -77,7 +91,7 @@ export function AppShell({ role, children }: { role: Role; children: ReactNode }
                 <NavLink to={item.to} className={styles.tab ?? ''}>
                   <span className={styles.icon}>
                     <Icon name={item.icon} size="1.4em" />
-                    {item.requestsBadge && <RequestsBadge />}
+                    {item.badge && <Badge kind={item.badge} />}
                   </span>
                   {item.wideLabel ? (
                     <>

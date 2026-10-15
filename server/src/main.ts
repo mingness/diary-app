@@ -29,6 +29,11 @@ async function main(): Promise<void> {
   if (config.captchaFixed) {
     app.log.warn('CAPTCHA_FIXED is on: every CAPTCHA answer is 3. Development only.');
   }
+  if (config.skipTotp) {
+    app.log.warn(
+      'SKIP_TOTP is on: sign-in never asks for an authenticator code. Development only.',
+    );
+  }
 
   try {
     await runMigrations(database, config.migrationsDir);

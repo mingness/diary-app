@@ -178,6 +178,12 @@ describe('session rules', () => {
     expect(isFullyAuthenticated('enrolment_required')).toBe(false);
   });
 
+  it('ask nobody for a code when SKIP_TOTP is on (development only)', () => {
+    expect(initialMfaState('SYS_ADMIN', true, true)).toBe('not_required');
+    expect(initialMfaState('SYS_ADMIN', false, true)).toBe('not_required');
+    expect(initialMfaState('NORMAL_USER', true, true)).toBe('not_required');
+  });
+
   it('tokens are 256-bit, unique, and stored only as their hash', () => {
     const a = newSessionToken();
     const b = newSessionToken();

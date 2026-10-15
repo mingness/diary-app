@@ -3,13 +3,14 @@
  *  1. build and start it, recreating the server so its in-memory per-IP limits start fresh;
  *  2. wipe and reseed its database, keeping the admins' authenticator keys (the seed makes new random ones
  *     each time and prints them only then);
- *  3. sign each project's user in once through the API, so tests reuse the session instead of spending the
- *     server's sign-in limit.
+ *  3. sign each project's user and leader in once through the API, and one SYS_ADMIN (with their authenticator
+ *     code), so tests reuse the sessions instead of spending the server's sign-in limit.
  * The stack keeps running afterwards so the next run starts quickly; `npm run e2e:down` removes it.
  */
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { request, type FullConfig } from '@playwright/test';
+import { TOTP } from 'otpauth';
 import { AUTH_DIR, CAPTCHA_ANSWER, SEED_PASSWORD, storageStateFor } from './fixtures.js';
 import { compose, repoRoot, stackAddresses } from './stack.js';
 
@@ -41,7 +42,10 @@ function reseed(databaseUrl: string): Record<string, string> {
   return keys;
 }
 
-async function saveSession(baseURL: string, username: string): Promise<void> {
+/** The SYS_ADMIN every project's admin tests share (see auth.spec: `admin` is kept for the sign-in form). */
+export const SESSION_ADMIN = 'admin2';
+
+async function saveSession(baseURL: string, username: string, totpKey?: string): Promise<void> {
   const context = await request.newContext({ baseURL });
   const captcha = (await (await context.get('/api/auth/captcha')).json()) as { id: string };
   const response = await context.post('/api/auth/login', {
@@ -58,6 +62,17 @@ async function saveSession(baseURL: string, username: string): Promise<void> {
         'Does .env have CAPTCHA_FIXED=true (the npm run dev:setup default)?',
     );
   }
+  // An administrator's second step: the current authenticator code, once (codes can't be reused).
+  const body = (await response.json()) as { status: string; csrfToken: string };
+  if (body.status === 'totp_required') {
+    if (!totpKey) throw new Error(`No authenticator key for ${username}`);
+    const code = new TOTP({ secret: totpKey, digits: 6, period: 30 }).generate();
+    const verified = await context.post('/api/auth/totp', {
+      headers: { 'x-csrf-token': body.csrfToken },
+      data: { code },
+    });
+    if (!verified.ok()) throw new Error(`Authenticator step for ${username} failed`);
+  }
   await context.storageState({ path: storageStateFor(username) });
   await context.dispose();
 }
@@ -66,7 +81,8 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   const { baseURL, databaseUrl } = stackAddresses();
   mkdirSync(AUTH_DIR, { recursive: true });
   startStack();
-  writeFileSync(new URL('seed.json', AUTH_DIR), JSON.stringify({ totpKeys: reseed(databaseUrl) }));
+  const totpKeys = reseed(databaseUrl);
+  writeFileSync(new URL('seed.json', AUTH_DIR), JSON.stringify({ totpKeys }));
 
   const users = new Set(
     config.projects
@@ -74,5 +90,6 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
       .filter(Boolean),
   );
   for (const user of users) await saveSession(baseURL, user!);
+  await saveSession(baseURL, SESSION_ADMIN, totpKeys[SESSION_ADMIN]);
   step('ready');
 }

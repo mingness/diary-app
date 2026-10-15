@@ -17,6 +17,7 @@ import { useToast } from '../../components/Toast.js';
 import { useGuardedEditor } from '../../components/UnsavedGuard.js';
 import { useI18n, useT } from '../../i18n/index.js';
 import { formatDateTime } from '../../lib/dates.js';
+import { useReportUnsaved } from '../../lib/unsaved.js';
 import { counterTone } from '../diary/rules.js';
 import { contentExtensions, countImages } from '../diary/schema.js';
 import {
@@ -143,6 +144,7 @@ function CommentForm({
       },
   });
   const dirty = view?.dirty ?? false;
+  useReportUnsaved(dirty);
   const chars = view?.chars ?? 0;
   const buttons = commentButtons({
     dirty,

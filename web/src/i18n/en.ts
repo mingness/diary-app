@@ -504,9 +504,20 @@ export const en: Messages = {
   'account.signOutDeviceLabel': 'Sign out {device}',
   'account.signedOutDevice': 'That device was signed out.',
   'account.authenticator': 'Authenticator',
+  'attention.rule.totp_changed': 'Authenticator changed',
+  'activity.kind.totp_changed': 'Authenticator changed',
+  'account.totpChange': 'Change authenticator',
+  'account.totpChangeIntro':
+    'For a new phone or a different authenticator app. Enter your password and a code from your current authenticator. The old one keeps working until you finish.',
+  'account.totpOldCode': '6-digit code from your current authenticator',
+  'account.totpNext': 'Next',
+  'account.totpScan': 'Scan this QR code with the new authenticator, then enter the code it shows.',
+  'account.totpNewCode': '6-digit code from the new authenticator',
+  'account.totpConfirm': 'Finish',
+  'account.totpChanged':
+    'Authenticator changed and your other devices signed out. The other administrators will see it under Attention.',
+  'account.totpReset': 'If you lose your authenticator, ask another administrator to remove it.',
   'account.totpOn': 'Your authenticator is on: sign-in asks for its code.',
-  'account.totpReset':
-    'If you change phones or lose your authenticator, ask another administrator to reset it.',
 
   'admin.role.NORMAL_USER': 'Student',
   'admin.role.COURSE_LEADER': 'Leader',
@@ -543,6 +554,25 @@ export const en: Messages = {
   'countAdmin.status.running': 'Running',
   'countAdmin.status.ok': 'Done',
   'countAdmin.status.failed': 'Failed',
+
+  'pwa.offline': 'You’re offline. Nothing new can be saved or loaded until the connection is back.',
+  'pwa.update': 'A new version is available.',
+  'pwa.reload': 'Reload',
+  'install.title': 'Add to home screen',
+  'install.why':
+    'Once it’s on your home screen, Cultivation Diary opens like an app and keeps you signed in.',
+  'install.button': 'Install',
+  'install.standalone': 'You’re using the installed app.',
+  'install.ios1': 'Tap Safari’s Share button (the square with an arrow pointing up).',
+  'install.ios2': 'Scroll down and choose “Add to Home Screen”.',
+  'install.ios3': 'Tap “Add” at the top right.',
+  'install.android1': 'Tap the browser’s menu (⋮) at the top right.',
+  'install.android2': 'Choose “Add to Home screen” or “Install app”.',
+  'install.wechat':
+    'Installing isn’t possible inside WeChat. Tap “⋯” at the top right, choose “Open in browser”, then add it to the home screen from there.',
+  'install.banner': 'Add Cultivation Diary to your home screen to open it more easily.',
+  'install.how': 'Show me',
+  'install.dismiss': 'No thanks',
 
   'error.not_found': 'This couldn’t be found.',
   'error.validation_failed': 'Some of the details aren’t right. Please check and try again.',

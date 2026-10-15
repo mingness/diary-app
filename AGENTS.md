@@ -2,6 +2,7 @@
 
 Working notes for anyone (human or AI) changing this repo. Read `docs/project_prompt.md` (what to build),
 `docs/project_prompt_engineering.md` (how), `docs/ARCHITECTURE.md` and `docs/FRONTEND.md` (the design) first.
+Day-to-day workflows (sample data, testing the authenticator, recovery, phones) are in `docs/DEVELOPING.md`.
 Keep this file up to date when commands, conventions or pitfalls change.
 
 ## Commands
@@ -27,6 +28,7 @@ Keep this file up to date when commands, conventions or pitfalls change.
 | Current code for a seeded admin's authenticator key    | `npm run cli -w server -- totp-code <key>` (only needed with `SKIP_TOTP=false`; dev skips the code)                    |
 | First admin / recovery (production, in the container)  | `node server/dist/cli.js create-sysadmin <name>` · `set-password <name>` · `reset-totp <name>`                         |
 | New migration after editing `server/src/db/schema.ts`  | `npm run db:generate -w server`, then review the SQL                                                                   |
+| Regenerate the app icons (after changing the design)   | `node web/scripts/make-icons.mjs` (writes `web/public/icons/`)                                                         |
 | Stop the database                                      | `npm run db:down` (add `-v` to `docker compose down` to wipe data)                                                     |
 
 ## Layout
@@ -110,6 +112,10 @@ Keep this file up to date when commands, conventions or pitfalls change.
   `web/src/api/client.ts` inside TanStack Query; screens show `ApiError` codes with `tError` and the request
   ID. Styles are CSS modules using the tokens in `web/src/styles/tokens.css`, sized in rem. A new screen gets
   an axe check in both themes in `web/e2e/` and works at 360 px and 22 px text.
+- **Unsaved writing:** an editor that can lose typing calls `useReportUnsaved(dirty)` (`web/src/lib/unsaved.ts`);
+  the new-version banner waits while any editor reports unsaved changes.
+- **Service worker:** it caches the built app files only. Never add runtime caching of `/api/` (diary content
+  must not sit in the device's cache); `web/e2e/pwa.spec.ts` checks the cache.
 - **E2E tests** read strings from the app's own tables via the `t` fixture, so one test covers both
   languages. Each project has a seeded user (`userPage`) and a course leader (`leaderPage`); two projects
   share each leader, so a leader test works on an entry its own student just created through the API. All

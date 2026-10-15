@@ -13,9 +13,11 @@ import { Icon } from '../../components/Icon.js';
 import { useToast } from '../../components/Toast.js';
 import { useI18n, useT } from '../../i18n/index.js';
 import { formatBytes } from '../../lib/images.js';
+import { InstallButton } from '../../components/InstallHelp.js';
 import { DevicesSection } from './DevicesSection.js';
 import { PasswordButton } from './PasswordSheet.js';
 import { ProfileSection } from './ProfileSection.js';
+import { TotpChangeButton } from './TotpChangeSheet.js';
 import { FONT_SIZES, type Appearance, type FontSize, type Theme } from '../../lib/appearance.js';
 import { useLogout } from './useLogout.js';
 import styles from './AccountScreen.module.css';
@@ -49,13 +51,17 @@ export function AccountScreen() {
       <section className={styles.section} aria-labelledby="security-heading">
         <h2 id="security-heading">{t('userForm.security')}</h2>
         <p>{t('account.storage', { size: formatBytes(me.storageBytes) })}</p>
-        <div>
+        <div className={styles.rowButtons}>
           <PasswordButton />
+          <InstallButton />
         </div>
         {me.role === 'SYS_ADMIN' && (
           <div>
             <h3>{t('account.authenticator')}</h3>
             <p>{t('account.totpOn')}</p>
+            <div>
+              <TotpChangeButton />
+            </div>
             <p className={styles.username}>{t('account.totpReset')}</p>
           </div>
         )}

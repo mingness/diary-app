@@ -10,6 +10,7 @@ import { useOpenRequests } from '../api/leader.js';
 import type { Role } from '@diary/shared';
 import { useI18n, type MessageKey } from '../i18n/index.js';
 import { Icon, type IconName } from './Icon.js';
+import { InstallSuggestion } from './InstallHelp.js';
 import { LanguageToggle } from './LanguageToggle.js';
 import styles from './AppShell.module.css';
 
@@ -82,6 +83,7 @@ export function AppShell({ role, children }: { role: Role; children: ReactNode }
   const isWide = useRouteFlag('wide');
   return (
     <>
+      <InstallSuggestion />
       <header className={styles.header}>
         <span className={styles.brand}>{t('app.title')}</span>
         <nav

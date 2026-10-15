@@ -13,6 +13,7 @@ import {
   MeResponse,
   OkResponse,
   SessionIdParams,
+  TotpChangeRequest,
   TotpCode,
   TotpSetupResponse,
   UpdateMeRequest,
@@ -27,6 +28,7 @@ import { recordActivity, safely } from '../services/activity.js';
 import { openProfile, openTotpSecret, sealTotpSecret } from '../services/profiles.js';
 import { setSessionMfa, type SessionRow } from '../services/sessions.js';
 import { storageBytesFor } from '../services/storage.js';
+import { confirmTotpChange, startTotpChange } from '../services/totp-change.js';
 import type { UserRow } from '../services/users.js';
 import { toSessionUser, type AuthThrottles } from './auth.js';
 
@@ -209,6 +211,49 @@ export function meRoutes(app: FastifyInstance, ctx: AppContext, throttles: AuthT
         .where(and(eq(users.id, user.id), isNull(users.totpEnabledAt)));
       if (session.mfa === 'enrolment_required') await setSessionMfa(ctx, session, user, 'verified');
       request.log.info({ event: 'totp_enabled', userId: user.id }, 'authenticator enabled');
+      return { ok: true as const };
+    },
+  );
+
+  routes.post(
+    '/api/me/totp/change',
+    {
+      onRequest: signedIn,
+      schema: {
+        tags: ME_TAG,
+        summary:
+          'Move my authenticator to a new app, step one: password and a current code; returns the new QR code',
+        body: TotpChangeRequest,
+        response: { 200: TotpSetupResponse },
+      },
+    },
+    async (request, reply) => {
+      const { user } = authOf(request);
+      const secret = await startTotpChange(ctx, user, request.body, throttles);
+      const uri = totpUri(secret, user.username);
+      reply.header('cache-control', 'no-store');
+      return { otpauthUri: uri, qrSvg: await QRCode.toString(uri, { type: 'svg', margin: 1 }) };
+    },
+  );
+
+  routes.post(
+    '/api/me/totp/change/confirm',
+    {
+      onRequest: signedIn,
+      schema: {
+        tags: ME_TAG,
+        summary:
+          'Step two: a code from the new app replaces the old authenticator and signs out my other devices',
+        body: TotpCode,
+        response: { 200: OkResponse },
+      },
+    },
+    async (request) => {
+      const { user, session } = authOf(request);
+      await confirmTotpChange(ctx, user, session, request.body.code, throttles.totp);
+      request.log.info({ event: 'totp_changed', userId: user.id }, 'authenticator moved');
+      // Raises a 注意 alert for every SYS_ADMIN, in case it wasn't the real owner.
+      await safely(request.log, () => recordActivity(ctx, user, 'totp_changed'));
       return { ok: true as const };
     },
   );

@@ -16,6 +16,7 @@ const RULE: Record<AlertRule, MessageKey> = {
   elevated_activity: 'attention.rule.elevated_activity',
   login_failures: 'attention.rule.login_failures',
   new_devices: 'attention.rule.new_devices',
+  totp_changed: 'attention.rule.totp_changed',
 };
 
 const KIND: Record<ActivityKind, MessageKey> = {
@@ -29,6 +30,7 @@ const KIND: Record<ActivityKind, MessageKey> = {
   login_failed: 'activity.kind.login_failed',
   new_device: 'activity.kind.new_device',
   password_changed: 'activity.kind.password_changed',
+  totp_changed: 'activity.kind.totp_changed',
 };
 
 /** What a limit or warning level counts: the limits (shared/src/limits.ts) and the usage kinds. */

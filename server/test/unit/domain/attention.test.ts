@@ -30,6 +30,10 @@ describe('attention rules', () => {
     expect(triggeredRule('login_failed', LOGIN_FAILURE_WARNING.count)).toBe('login_failures');
   });
 
+  it('a changed authenticator always flags the account, so the other admins hear of it', () => {
+    expect(triggeredRule('totp_changed', 1)).toBe('totp_changed');
+  });
+
   it('new devices flag the account only at the burst threshold', () => {
     expect(triggeredRule('new_device', NEW_DEVICE_WARNING.count - 1)).toBeNull();
     expect(triggeredRule('new_device', NEW_DEVICE_WARNING.count)).toBe('new_devices');

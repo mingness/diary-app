@@ -41,6 +41,7 @@ export function triggeredRule(
     return limit !== undefined && FLAGGING_LIMITS.has(limit as LimitName) ? 'limit_reached' : null;
   }
   if (kind === 'elevated_activity') return 'elevated_activity';
+  if (kind === 'totp_changed') return 'totp_changed';
   if (kind === 'login_failed' && recentCount >= LOGIN_FAILURE_WARNING.count)
     return 'login_failures';
   if (kind === 'new_device' && recentCount >= NEW_DEVICE_WARNING.count) return 'new_devices';

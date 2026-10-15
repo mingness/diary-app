@@ -247,6 +247,7 @@ describe('record labels (contexts.ts)', () => {
     [fieldAad.comment('D', 'C'), 'document:D:comment:C'],
     [fieldAad.profile('U'), 'profile:U:fields'],
     [fieldAad.totpSecret('U'), 'profile:U:totp'],
+    [fieldAad.totpPending('U'), 'profile:U:totp-pending'],
   ])('%s', (actual, expected) => {
     expect(actual).toBe(expected);
   });

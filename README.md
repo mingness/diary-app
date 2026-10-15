@@ -5,7 +5,7 @@ daily-count (報數) activity. Diaries are encrypted at rest; account administra
 
 - What it does: [docs/project_prompt.md](docs/project_prompt.md)
 - How it's built: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), screens in [docs/FRONTEND.md](docs/FRONTEND.md)
-- Working on it: [AGENTS.md](AGENTS.md)
+- Working on it: [AGENTS.md](AGENTS.md); running, resetting and phone testing: [docs/DEVELOPING.md](docs/DEVELOPING.md)
 
 **Status:** Phase A done (slices 1–10): skeleton; core domain; users and sign-in; SYS_ADMIN user management,
 activity log, Attention list and optional email alerts; the diary (encrypted entries, drafts, 提交/更新 with
@@ -14,9 +14,9 @@ reading submitted entries with a read audit, comments, sharing requests and appr
 02:00 Beijing, SYS_ADMIN tools); translation through an optional OpenAI-compatible provider. Phase B (the web
 app) has begun: the app shell (themes, text sizes, both languages); sign-in, registration, forgot password
 and authenticator setup; my diary, the entry view, the editor (photos, limits, 提交/更新, history) and open
-diaries; the leaders' review; the SYS_ADMIN screens; 報數 and the account page (slices 11–16). Next: the
-installable app (manifest, offline shell, update toast). Features arrive slice
-by slice (see the delivery plan in ARCHITECTURE.md §11).
+diaries; the leaders' review; the SYS_ADMIN screens; 報數 and the account page; the installable app (manifest,
+app-shell-only service worker, offline notice, update banner, install help) (slices 11–17). Next: the D10 phone
+check, then Phase C (production). See the delivery plan in ARCHITECTURE.md §11.
 
 ## Quick start
 

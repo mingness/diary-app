@@ -289,7 +289,7 @@ snapshot at 360 px and 1280 px.
 
 - After the user's third visit on a phone browser that supports installing, a dismissible banner offers
   "加到主畫面" once. The Account page always has the how-to.
-- When a new version is ready, a toast offers "新版本可用 — 重新載入". It's never shown while an editor has
+- When a new version is ready, a banner at the top offers "新版本可用 — 重新載入". It's never shown while an editor has
   unsaved changes; it waits until they're saved.
 - With no connection, the app shell shows "目前離線" instead of the browser's error page. Nothing is written
   offline in v1 (F6, agreed). This is a deliberate simplification: offline writing needs a local queue of

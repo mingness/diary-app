@@ -13,6 +13,8 @@ export const en: ServerStrings = {
     elevated_activity: 'Unusually busy today (reached a warning level).',
     login_failures: 'Many failed sign-ins within an hour.',
     new_devices: 'Signed in from several new devices within a day.',
+    totp_changed:
+      'Moved their authenticator to a new app. If they didn’t, remove it and reset their password.',
   },
   alertAction: 'Review it in the app under Attention (注意).',
   summarySubject: (open) => `Daily summary: ${open} open item(s) in Attention`,

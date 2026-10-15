@@ -320,6 +320,12 @@ for any submitted entry, their own included, and the review lists include their 
   It needs the CAPTCHA and is rate-limited, because anyone can lock any account by name. SYS_ADMIN accounts
   can't be locked from this public form (otherwise anyone could lock every admin out); a locked-out admin is
   recovered by another admin or the CLI (`set-password`, `reset-totp`).
+- **Changing one's own authenticator (Q1):** a SYS_ADMIN who still has their app can move to a new one from
+  the account page. Step one (`POST /api/me/totp/change`) needs the password and a current code (both on the
+  sign-in throttles) and stores a new secret as pending (sealed under its own label, `profile:<id>:totp-pending`);
+  the old app keeps working. Step two (`POST /api/me/totp/change/confirm`) needs a code from the new app,
+  swaps the secrets, signs out every other device, and records `totp_changed`, which always raises a 注意
+  alert, so the other admins hear of it if a stolen session did it. A lost phone stays a recovery task.
 - **Accounts:** usernames are 3–32 characters (letters, digits, `.` `_` `-`), unique ignoring case; passwords
   8–256 characters. Failed logins answer the same and take the same time for unknown users, wrong passwords
   and locked accounts. Five failures for a username within 15 minutes block it for the rest of the window;
@@ -618,8 +624,13 @@ states. Each slice is one screen group, with Playwright e2e tests at 360 px and 
 16. **報數 and account.** *(Done. `GET /api/count/summary` gained `mine` (my number and manual reports for
     each allowed date). 報數 is a tab for every role, SYS_ADMINs included; 報數管理 is a link from it. The
     account page has profile (photo resized in the browser), appearance, storage, password (a sheet), the
-    SYS_ADMIN authenticator status (self-reset still deferred, Q1), devices, and sign-out.)*
+    SYS_ADMIN authenticator status and, since Q1 was decided, changing it; devices; and sign-out.)*
 17. **Installable web app:** manifest, service worker, update toast, install help. Then the phone check for D10.
+    *(Done, except the D10 phone check, which needs real phones. `vite-plugin-pwa` (generateSW) precaches only
+    the built app files; there is no runtime caching, and `/api/` is never answered by the service worker.
+    The update offer is a banner rather than a toast, hidden while any editor (entry or comment) reports
+    unsaved writing via `web/src/lib/unsaved.ts`. Install help is a sheet on the account page plus the
+    third-visit banner on phones; icons come from `web/scripts/make-icons.mjs`.)*
 
 ### Phase C: production
 
@@ -658,5 +669,5 @@ Each slice ships with tests, both languages where it has UI, permission tests pe
 | D26 | Spotting odd behaviour | **Agreed**: metadata-only activity log (90 days), Attention list with simple rules, sign-out-all, lock, delete counts by date range. §8.9 |
 | D27 | Alerting SYS_ADMINs | **Agreed**: in-app Attention list always; email via SMTP (`nodemailer`, approved) from a QQ/163 mailbox when `SMTP_URL` is set. Web Push rejected: Android push is blocked in mainland China |
 | D28 | Warning levels separate from caps | **Agreed**: limits exist to spot misuse, keep leaders' reading load manageable and keep entries lean. Caps refuse; warning levels (about half the caps, plus 40 submitted comments a day) only flag the account, once a day. Per-entry refusals no longer flag. Comments have the entry's per-entry limits. §8.3, §8.9 |
-| Q1 | SYS_ADMIN resetting their own authenticator (spec §4.4 "set up / reset") | **Deferred** (2026-10-15): another SYS_ADMIN or the CLI resets it. Revisit once the frontend is built |
+| Q1 | SYS_ADMIN resetting their own authenticator (spec §4.4 "set up / reset") | **Agreed** (2026-10-15): yes, with the password and a current code, confirmed by a code from the new app; other devices are signed out and a 注意 alert is raised. A lost authenticator is still removed by another SYS_ADMIN or the CLI (§8, sign-in) |
 | F1–F6 | Frontend decisions | **Agreed**: see FRONTEND.md §11 |

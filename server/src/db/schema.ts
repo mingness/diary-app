@@ -63,6 +63,9 @@ export const users = pgTable(
     totpEnabledAt: timestamptz('totp_enabled_at'),
     /** Last accepted TOTP time step, so a code can't be used twice. */
     totpLastStep: integer('totp_last_step'),
+    /** A replacement TOTP secret while its owner switches apps; the current one works until it is confirmed. */
+    totpPendingCt: bytea('totp_pending_ct'),
+    totpPendingNonce: bytea('totp_pending_nonce'),
     fontSize: smallint('font_size').notNull().default(18),
     theme: themeEnum('theme').notNull().default('system'),
     /** {familyName, givenName, address, photo} as encrypted JSON. */
@@ -80,6 +83,10 @@ export const users = pgTable(
     check(
       'users_totp_pair_check',
       sql`(${t.totpSecretCt} IS NULL) = (${t.totpSecretNonce} IS NULL)`,
+    ),
+    check(
+      'users_totp_pending_pair_check',
+      sql`(${t.totpPendingCt} IS NULL) = (${t.totpPendingNonce} IS NULL)`,
     ),
     uniqueIndex('users_email_lower_key')
       .on(sql`lower(${t.email})`)
@@ -135,6 +142,7 @@ export const activityKindEnum = pgEnum('activity_kind', [
   'login_failed',
   'new_device',
   'password_changed',
+  'totp_changed',
 ]);
 
 export const activityEvents = pgTable(
@@ -160,6 +168,7 @@ export const alertRuleEnum = pgEnum('alert_rule', [
   'elevated_activity',
   'login_failures',
   'new_devices',
+  'totp_changed',
 ]);
 
 export const alerts = pgTable(

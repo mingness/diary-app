@@ -24,6 +24,7 @@ export const zhHant: ServerStrings = {
     elevated_activity: '今日活動量偏高（已達警示門檻）。',
     login_failures: '一小時內多次登入失敗。',
     new_devices: '一天內從多個新裝置登入。',
+    totp_changed: '已把驗證器換到新的應用程式。如非本人操作，請移除其驗證器並重設密碼。',
   },
   alertAction: '請在應用程式的「注意」頁查看。',
   summarySubject: (open) => `每日摘要：「注意」有 ${open} 項未處理`,

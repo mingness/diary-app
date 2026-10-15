@@ -38,3 +38,9 @@ export const DeviceSession = z.object({
 export const DeviceList = z.object({ sessions: z.array(DeviceSession) });
 
 export const SessionIdParams = z.object({ id: z.string().regex(/^[0-9a-f]{64}$/) });
+
+/** Step one of moving the authenticator to a new app: proof of both the password and the current app. */
+export const TotpChangeRequest = z.object({
+  currentPassword: z.string().max(256),
+  code: z.string().regex(/^\d{6}$/),
+});

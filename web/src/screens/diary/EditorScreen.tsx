@@ -36,6 +36,7 @@ import { Notice } from '../../components/Notice.js';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States.js';
 import { useToast } from '../../components/Toast.js';
 import { useI18n } from '../../i18n/index.js';
+import { useReportUnsaved } from '../../lib/unsaved.js';
 import { beijingDate, formatDiaryDate, formatTime } from '../../lib/dates.js';
 import { readToolbarState, Toolbar, usePhotoInsert, type EditorMessage } from './editorParts.js';
 import { HistorySheet } from './HistorySheet.js';
@@ -163,6 +164,7 @@ function EntryEditor({ initial }: { initial: OwnerEntry | null }) {
   const access = live?.view === 'owner' ? live.access : server.access;
 
   const dirty = (view?.bodyChanged ?? false) || title !== savedTitle;
+  useReportUnsaved(dirty);
   const chars = view?.chars ?? 0;
   const saving = status.kind === 'saving';
   const buttons = editorButtons({

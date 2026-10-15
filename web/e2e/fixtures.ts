@@ -16,6 +16,8 @@ export interface E2eOptions {
   user: string;
   /** The seeded course leader this project signs in as. */
   leader: string;
+  /** Whether the phone's install suggestion may appear (it would get in the way of other tests). */
+  suggestInstall: boolean;
 }
 
 export const SEED_PASSWORD = 'password123';
@@ -48,12 +50,10 @@ export const test = base.extend<E2eOptions & Fixtures>({
   lang: ['zh-Hant', { option: true }],
   user: ['chenmd', { option: true }],
   leader: ['leader.lin', { option: true }],
+  suggestInstall: [false, { option: true }],
 
-  page: async ({ page, lang }, use) => {
-    // The project's language unless the test has switched it (the toggle writes the same key).
-    await page.addInitScript((value) => {
-      if (!localStorage.getItem('diary.lang')) localStorage.setItem('diary.lang', value);
-    }, lang);
+  page: async ({ page, lang, suggestInstall }, use) => {
+    await page.addInitScript(setUp, { lang, suggestInstall });
     await use(page);
   },
 
@@ -62,32 +62,42 @@ export const test = base.extend<E2eOptions & Fixtures>({
     await use((key, vars) => format(messages, key, vars));
   },
 
-  userPage: async ({ browser, lang, user }, use) => {
-    const page = await signedInPage(browser, lang, user);
+  userPage: async ({ browser, lang, user, suggestInstall }, use) => {
+    const page = await signedInPage(browser, { lang, suggestInstall }, user);
     await use(page);
     await page.context().close();
   },
 
-  leaderPage: async ({ browser, lang, leader }, use) => {
-    const page = await signedInPage(browser, lang, leader);
+  leaderPage: async ({ browser, lang, leader, suggestInstall }, use) => {
+    const page = await signedInPage(browser, { lang, suggestInstall }, leader);
     await use(page);
     await page.context().close();
   },
 
-  adminPage: async ({ browser, lang }, use) => {
+  adminPage: async ({ browser, lang, suggestInstall }, use) => {
     // Matches SESSION_ADMIN in global-setup.ts.
-    const page = await signedInPage(browser, lang, 'admin2');
+    const page = await signedInPage(browser, { lang, suggestInstall }, 'admin2');
     await use(page);
     await page.context().close();
   },
 });
 
+interface PageSetUp {
+  lang: Lang;
+  suggestInstall: boolean;
+}
+
+/** Runs in the page before the app: the project's language unless the test has switched it (the toggle
+ * writes the same key), and the install suggestion out of the way unless the test is about it. */
+function setUp({ lang, suggestInstall }: PageSetUp) {
+  if (!localStorage.getItem('diary.lang')) localStorage.setItem('diary.lang', lang);
+  if (!suggestInstall) localStorage.setItem('diary.installDismissed', 'true');
+}
+
 /** A new browser context with a session saved by global setup, in the project's language. */
-async function signedInPage(browser: Browser, lang: Lang, username: string): Promise<Page> {
+async function signedInPage(browser: Browser, setup: PageSetUp, username: string): Promise<Page> {
   const context = await browser.newContext({ storageState: storageStateFor(username) });
-  await context.addInitScript((value) => {
-    if (!localStorage.getItem('diary.lang')) localStorage.setItem('diary.lang', value);
-  }, lang);
+  await context.addInitScript(setUp, setup);
   return context.newPage();
 }
 

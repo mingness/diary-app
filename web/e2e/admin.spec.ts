@@ -225,3 +225,21 @@ test('the admin screens pass axe in both themes and fit at the largest text size
     await page.evaluate(() => (document.documentElement.style.fontSize = ''));
   }
 });
+
+test('a SYS_ADMIN can start changing their authenticator, and the sheet passes axe', async ({
+  adminPage: page,
+  t,
+}) => {
+  // Opened only: finishing would replace the shared admin session's authenticator for every project.
+  await page.goto('/me');
+  await page.getByRole('button', { name: t('account.totpChange') }).click();
+  const sheet = page.getByRole('dialog', { name: t('account.totpChange') });
+  await expect(sheet.getByLabel(t('account.totpOldCode'))).toBeVisible();
+  await sheet.getByRole('button', { name: t('account.totpNext') }).click();
+  await expect(sheet.getByText(t('totp.codeInvalid'))).toBeVisible();
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    const results = await new AxeBuilder({ page }).analyze();
+    expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target)}`)).toEqual([]);
+  }
+});

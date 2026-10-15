@@ -57,6 +57,13 @@
       "when": 1792056991571,
       "tag": "0007_read_audit_leader_index",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792074506519,
+      "tag": "0008_totp_change",
+      "breakpoints": true
     }
   ]
 }

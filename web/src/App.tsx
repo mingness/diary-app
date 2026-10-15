@@ -17,6 +17,7 @@ import type { Role } from '@diary/shared';
 import { RouterProvider } from 'react-router/dom';
 import { ApiError } from './api/client.js';
 import { useMe, useSession, type Session } from './api/session.js';
+import { OfflineBanner, UpdateBanner } from './components/AppBanners.js';
 import { AppShell } from './components/AppShell.js';
 import { AuthLayout } from './components/AuthLayout.js';
 import { Button } from './components/Button.js';
@@ -216,6 +217,8 @@ const router = createBrowserRouter([
     element: (
       <>
         <ScrollRestoration />
+        <OfflineBanner />
+        <UpdateBanner />
         <Outlet />
       </>
     ),

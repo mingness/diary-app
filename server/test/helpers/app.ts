@@ -180,7 +180,7 @@ export async function signedInAdmin(
   t: TestApp,
   /** `remember` signs in as a remembered device (30 days for admins), for tests that move the clock far. */
   options: { email?: string; remember?: boolean } = {},
-): Promise<Signin & { id: string; username: string }> {
+): Promise<Signin & { id: string; username: string; secret: string }> {
   const { createSysadmin } = await import('../../src/services/admin-tools.js');
   const { currentTotpCode, generateTotpSecret } = await import('../../src/domain/auth/totp.js');
   const { users } = await import('../../src/db/schema.js');
@@ -207,5 +207,5 @@ export async function signedInAdmin(
     payload: { code: currentTotpCode(secret, t.clock.now()) },
   });
   if (res.statusCode !== 200) throw new Error(`admin sign-in failed: ${res.body}`);
-  return { ...signin, csrf: res.json().csrfToken, id: user.id, username };
+  return { ...signin, csrf: res.json().csrfToken, id: user.id, username, secret };
 }

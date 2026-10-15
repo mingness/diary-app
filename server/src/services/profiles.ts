@@ -70,3 +70,29 @@ export function openTotpSecret(
     fieldAad.totpSecret(userId),
   );
 }
+
+/** A replacement authenticator secret, sealed under its own label so it can't pass for the active one. */
+export function sealTotpPending(
+  keyring: Keyring,
+  userId: string,
+  profileDekWrapped: Buffer,
+  secret: string,
+): { totpPendingCt: Buffer; totpPendingNonce: Buffer } {
+  const dek = unwrapDek(keyring, profileDekWrapped, dekContext.profile(userId));
+  const sealed = sealText(dek, secret, fieldAad.totpPending(userId));
+  return { totpPendingCt: sealed.ciphertext, totpPendingNonce: sealed.nonce };
+}
+
+export function openTotpPending(
+  keyring: Keyring,
+  userId: string,
+  profileDekWrapped: Buffer,
+  sealed: { totpPendingCt: Buffer; totpPendingNonce: Buffer },
+): string {
+  const dek = unwrapDek(keyring, profileDekWrapped, dekContext.profile(userId));
+  return openText(
+    dek,
+    { nonce: sealed.totpPendingNonce, ciphertext: sealed.totpPendingCt },
+    fieldAad.totpPending(userId),
+  );
+}

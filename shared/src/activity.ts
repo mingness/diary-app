@@ -16,6 +16,8 @@ export const ActivityKind = z.enum([
   'login_failed',
   'new_device',
   'password_changed',
+  /** A SYS_ADMIN moved their own authenticator to a new app. */
+  'totp_changed',
 ]);
 export type ActivityKind = z.infer<typeof ActivityKind>;
 
@@ -24,6 +26,8 @@ export const AlertRule = z.enum([
   'elevated_activity',
   'login_failures',
   'new_devices',
+  /** Always raised, so the other admins hear of it if it wasn't the real owner. */
+  'totp_changed',
 ]);
 export type AlertRule = z.infer<typeof AlertRule>;
 

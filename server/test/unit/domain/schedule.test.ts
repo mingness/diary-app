@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   beijingDate,
   beijingDayRange,
+  monthDates,
   nextDailyRunAt,
 } from '../../../src/domain/count/schedule.js';
 
@@ -98,5 +99,19 @@ describe('msUntilNextRun', () => {
     expect(msUntilNextRun({ dailyAtBeijingHour: 3 }, now)).toBe(30 * 60 * 1000);
     expect(msUntilNextRun({ dailyAtBeijingHour: 2 }, now)).toBe((23 * 60 + 30) * 60 * 1000);
     expect(msUntilNextRun({ everyMs: 60_000 }, now)).toBe(60_000);
+  });
+});
+
+describe('monthDates', () => {
+  it.each([
+    ['2026-10', '2026-10-01', '2026-11-01'],
+    ['2026-09', '2026-09-01', '2026-10-01'], // carries into a two-digit month
+    ['2026-12', '2026-12-01', '2027-01-01'], // rolls the year
+  ])('%s spans %s up to %s', (month, first, next) => {
+    expect(monthDates(month)).toEqual({ first, next });
+  });
+
+  it.each(['2026-13', '2026-1', '2026-00', '26-10'])('refuses %s', (month) => {
+    expect(() => monthDates(month)).toThrow(RangeError);
   });
 });

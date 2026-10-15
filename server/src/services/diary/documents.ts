@@ -18,24 +18,26 @@ import type { AppContext } from '../../context.js';
 import { comments, documents, documentVersions } from '../../db/schema.js';
 import { openText, sealText } from '../../domain/crypto/aead.js';
 import { fieldAad } from '../../domain/crypto/contexts.js';
-import { beijingDate } from '../../domain/count/schedule.js';
+import { beijingDate, monthDates } from '../../domain/count/schedule.js';
 import { inspectBody, type InspectedBody } from '../../domain/diary/sanitize.js';
 import { HttpError } from '../../http-errors.js';
 import { documentKey, newDocumentKey } from './keys.js';
-import { consumeDaily, LimitReachedError, type Tx } from './usage.js';
+import { consumeDaily, LimitReachedError, type Elevated, type Tx } from './usage.js';
 
-type DocumentRow = typeof documents.$inferSelect;
+export type DocumentRow = typeof documents.$inferSelect;
 
 export interface Written {
   readonly document: OwnDocument;
   /** What to record once the write has committed; null when nothing changed. */
   readonly activity: ActivityKind | null;
+  /** A daily warning level this write reached, to flag once it has committed. */
+  readonly elevated: Elevated | null;
 }
 
-const notFound = () => new HttpError(404, ErrorCode.NotFound, 'No such entry');
+export const notFound = () => new HttpError(404, ErrorCode.NotFound, 'No such entry');
 
 /** Per-entry checks that apply to drafts and submissions alike. */
-function checkSize(body: InspectedBody): void {
+export function checkSize(body: InspectedBody): void {
   if (body.imageBytes.length > ENTRY_LIMITS.images) throw new LimitReachedError('images');
   if (body.imageBytes.some((b) => b > ENTRY_LIMITS.imageBytes)) {
     throw new HttpError(413, ErrorCode.TooLarge, 'An image is too large', {
@@ -59,7 +61,7 @@ function stateOf(row: DocumentRow): OwnDocument['state'] {
   return row.draftCt ? 'submitted_with_draft' : 'submitted';
 }
 
-function toOwnDocument(ctx: AppContext, row: DocumentRow): OwnDocument {
+export function toOwnDocument(ctx: AppContext, row: DocumentRow): OwnDocument {
   const dek = documentKey(ctx, row.id, row.dekWrapped);
   const submitted =
     row.contentCt && row.contentNonce && row.lastSubmittedAt
@@ -116,8 +118,9 @@ export async function createDocument(
 ): Promise<Written> {
   const body = inspectBody(input.body);
   checkSize(body);
+  let elevated: Elevated | null = null;
   const row = await ctx.db.transaction(async (tx) => {
-    await consumeDaily(tx, ctx, ownerId, 'create');
+    elevated = await consumeDaily(tx, ctx, ownerId, 'create');
     const now = ctx.clock();
     const id = randomUUID();
     const { dek, dekWrapped, keyVersion } = newDocumentKey(ctx, id);
@@ -142,7 +145,7 @@ export async function createDocument(
     if (!inserted) throw new Error('insert returned no row');
     return inserted;
   });
-  return { document: toOwnDocument(ctx, row), activity: 'entry_created' };
+  return { document: toOwnDocument(ctx, row), activity: 'entry_created', elevated };
 }
 
 /**
@@ -188,7 +191,7 @@ export async function saveDraft(
     if (!updated) throw notFound();
     return updated;
   });
-  return { document: toOwnDocument(ctx, row), activity: null };
+  return { document: toOwnDocument(ctx, row), activity: null, elevated: null };
 }
 
 /**
@@ -207,6 +210,7 @@ export async function submitDocument(
   if (body.visibleChars > ENTRY_LIMITS.chars) throw new LimitReachedError('chars');
 
   let activity: ActivityKind | null = null;
+  let elevated: Elevated | null = null;
   const row = await ctx.db.transaction(async (tx) => {
     const current = await lockOwn(tx, ownerId, id);
     const dek = documentKey(ctx, id, current.dekWrapped);
@@ -215,7 +219,7 @@ export async function submitDocument(
     const clearDraft = { draftTitle: null, draftCt: null, draftNonce: null, draftSavedAt: null };
 
     if (!current.firstSubmittedAt) {
-      await consumeDaily(tx, ctx, ownerId, 'submit');
+      elevated = await consumeDaily(tx, ctx, ownerId, 'submit');
       activity = 'entry_submitted';
     } else {
       const previous = openText(
@@ -234,7 +238,7 @@ export async function submitDocument(
           .returning();
         return unchanged ?? current;
       }
-      await consumeDaily(tx, ctx, ownerId, 'update');
+      elevated = await consumeDaily(tx, ctx, ownerId, 'update');
       activity = 'entry_updated';
       await archiveVersion(tx, id, dek, previous, now);
     }
@@ -255,7 +259,7 @@ export async function submitDocument(
     if (!updated) throw notFound();
     return updated;
   });
-  return { document: toOwnDocument(ctx, row), activity };
+  return { document: toOwnDocument(ctx, row), activity, elevated };
 }
 
 /** Stores the outgoing body as the next version and drops all but the newest MAX_VERSIONS. */
@@ -284,52 +288,9 @@ async function archiveVersion(tx: Tx, documentId: string, dek: Buffer, html: str
     );
 }
 
-export async function getOwnDocument(
-  ctx: AppContext,
-  ownerId: string,
-  id: string,
-): Promise<OwnDocument> {
-  const [row] = await ctx.db
-    .select()
-    .from(documents)
-    .where(and(eq(documents.id, id), eq(documents.ownerId, ownerId)))
-    .limit(1);
-  if (!row) throw notFound();
-  return toOwnDocument(ctx, row);
-}
-
-/** The owner's history versions, newest first (spec §5.2 历史版本). */
-export async function listOwnVersions(ctx: AppContext, ownerId: string, id: string) {
-  const [doc] = await ctx.db
-    .select({ dekWrapped: documents.dekWrapped })
-    .from(documents)
-    .where(and(eq(documents.id, id), eq(documents.ownerId, ownerId)))
-    .limit(1);
-  if (!doc) throw notFound();
-  const dek = documentKey(ctx, id, doc.dekWrapped);
-  const rows = await ctx.db
-    .select()
-    .from(documentVersions)
-    .where(eq(documentVersions.documentId, id))
-    .orderBy(desc(documentVersions.versionNo));
-  return {
-    versions: rows.map((v) => ({
-      versionNo: v.versionNo,
-      createdAt: v.createdAt.toISOString(),
-      body: openText(
-        dek,
-        { ciphertext: v.contentCt, nonce: v.contentNonce },
-        fieldAad.documentVersion(id, v.versionNo),
-      ),
-    })),
-  };
-}
-
 /** The owner's entries for one Beijing month, newest first, with their comment counts (spec §6.1). */
 export async function listOwnMonth(ctx: AppContext, ownerId: string, month: string) {
-  const [year, mon] = month.split('-').map(Number) as [number, number];
-  const start = `${month}-01`;
-  const end = mon === 12 ? `${year + 1}-01-01` : `${year}-${String(mon + 1).padStart(2, '0')}-01`;
+  const { first, next } = monthDates(month);
   const rows = await ctx.db
     .select({
       id: documents.id,
@@ -346,8 +307,8 @@ export async function listOwnMonth(ctx: AppContext, ownerId: string, month: stri
     .where(
       and(
         eq(documents.ownerId, ownerId),
-        gte(documents.diaryDate, start),
-        lt(documents.diaryDate, end),
+        gte(documents.diaryDate, first),
+        lt(documents.diaryDate, next),
       ),
     )
     .groupBy(documents.id)

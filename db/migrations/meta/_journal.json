@@ -22,6 +22,20 @@
       "when": 1792000957081,
       "tag": "0002_diary",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792021545651,
+      "tag": "0003_read_audit",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792026101778,
+      "tag": "0004_warning_levels",
+      "breakpoints": true
     }
   ]
 }

@@ -129,6 +129,7 @@ export const activityKindEnum = pgEnum('activity_kind', [
   'entry_updated',
   'count_entry',
   'limit_reached',
+  'elevated_activity',
   'login',
   'login_failed',
   'new_device',
@@ -155,6 +156,7 @@ export const activityEvents = pgTable(
 
 export const alertRuleEnum = pgEnum('alert_rule', [
   'limit_reached',
+  'elevated_activity',
   'login_failures',
   'new_devices',
 ]);
@@ -229,6 +231,7 @@ export const documents = pgTable(
     firstSubmittedAt: timestamptz('first_submitted_at'),
     lastSubmittedAt: timestamptz('last_submitted_at'),
     access: accessEnum('access').notNull().default('private'),
+    /** Who last changed sharing, and when (for a waiting entry: the owner's request). */
     accessDecidedBy: uuid('access_decided_by').references(() => users.id, { onDelete: 'set null' }),
     accessDecidedAt: timestamptz('access_decided_at'),
     dekWrapped: bytea('dek_wrapped').notNull(),
@@ -274,7 +277,7 @@ export const documentVersions = pgTable(
 
 export const commentStateEnum = pgEnum('comment_state', ['draft', 'submitted']);
 
-/** One per leader per entry (spec §3). The comment API arrives in delivery slice 6. */
+/** One per leader per entry (spec §3). A comment is either a draft (only its leader sees it) or submitted. */
 export const comments = pgTable(
   'comments',
   {
@@ -298,7 +301,7 @@ export const comments = pgTable(
   ],
 );
 
-export const usageKindEnum = pgEnum('usage_kind', ['create', 'submit', 'update']);
+export const usageKindEnum = pgEnum('usage_kind', ['create', 'submit', 'update', 'comment']);
 
 /**
  * Counters for the daily limits (D21). Kept apart from the entries so deleting an entry refunds nothing.
@@ -315,4 +318,26 @@ export const dailyUsage = pgTable(
     n: integer('n').notNull(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.day, t.kind] })],
+);
+
+/**
+ * Which leader opened which entry, and when (docs/ARCHITECTURE.md §5). A security log only: never shown to
+ * diary owners (spec §5.4). Kept as long as activity events.
+ */
+export const readAudit = pgTable(
+  'read_audit',
+  {
+    id: uuid('id').primaryKey(),
+    /** Null once the leader's account is deleted; the username stays so the record still means something. */
+    leaderId: uuid('leader_id').references(() => users.id, { onDelete: 'set null' }),
+    leaderUsername: text('leader_username').notNull(),
+    documentId: uuid('document_id')
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+    readAt: timestamptz('read_at').notNull(),
+  },
+  (t) => [
+    index('read_audit_document_idx').on(t.documentId, t.readAt),
+    index('read_audit_read_at_idx').on(t.readAt),
+  ],
 );

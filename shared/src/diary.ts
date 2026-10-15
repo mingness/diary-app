@@ -1,4 +1,4 @@
-/** Diary entries for their owner (spec §5). Leader and open-diary views arrive with their API slices. */
+/** Diary entries (spec §5): the owner's view, the leader's view, comments and sharing. */
 import { z } from 'zod';
 import { Access } from './roles.js';
 import { ENTRY_LIMITS } from './limits.js';
@@ -39,10 +39,77 @@ export const OwnDocument = z.object({
 });
 export type OwnDocument = z.infer<typeof OwnDocument>;
 
-export const MyDocumentsQuery = z.object({
-  /** `YYYY-MM`, Beijing calendar month. */
-  month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+/** A submitted comment, as the owner, other leaders and (for open entries) readers see it (spec §5.4). */
+export const SubmittedComment = z.object({
+  id: z.uuid(),
+  /** "family given", or the username without a name; null when the leader's account has been deleted. */
+  authorName: z.string().nullable(),
+  submittedAt: z.iso.datetime(),
+  body: z.string(),
 });
+export type SubmittedComment = z.infer<typeof SubmittedComment>;
+
+/** The leader's own comment on an entry; only that leader ever sees it while it's a draft. */
+export const MyComment = z.object({
+  body: z.string(),
+  state: z.enum(['draft', 'submitted']),
+  submittedAt: z.iso.datetime().nullable(),
+  updatedAt: z.iso.datetime(),
+});
+export type MyComment = z.infer<typeof MyComment>;
+
+/** `GET /api/documents/:id` for the owner: everything, plus submitted comments with a "new" marker. */
+export const OwnerEntryView = OwnDocument.extend({
+  view: z.literal('owner'),
+  comments: z.array(
+    SubmittedComment.extend({
+      /** Submitted since the owner last opened the entry (drives the 有新批注 marker). */
+      isNew: z.boolean(),
+    }),
+  ),
+  /** A leader's own comment on their own entry (never one of `comments`); null for everyone else. */
+  myComment: MyComment.nullable(),
+});
+
+/** Whose entry it is, as leaders see it. */
+export const EntryAuthor = z.object({ id: z.uuid(), username: z.string(), name: z.string() });
+
+/**
+ * `GET /api/documents/:id` for a leader (not the owner): the last submitted version only, never the owner's
+ * draft; other leaders' submitted comments; and this leader's own comment.
+ */
+export const LeaderEntryView = z.object({
+  view: z.literal('leader'),
+  id: z.uuid(),
+  diaryDate: z.iso.date(),
+  access: Access,
+  author: EntryAuthor,
+  title: z.string(),
+  body: z.string(),
+  submittedAt: z.iso.datetime(),
+  comments: z.array(SubmittedComment),
+  myComment: MyComment.nullable(),
+});
+
+export const EntryView = z.discriminatedUnion('view', [OwnerEntryView, LeaderEntryView]);
+export type EntryView = z.infer<typeof EntryView>;
+
+/** 暫存 (`draft`) or 提交 (`submitted`) the leader's comment. A submitted comment needs some text or a photo. */
+export const SaveCommentRequest = z.object({
+  body: DocumentBody,
+  state: z.enum(['draft', 'submitted']),
+});
+
+/** Sharing changes (spec §5.3, docs/ARCHITECTURE.md §7.2). The server decides who may do which. */
+export const AccessChangeRequest = z.object({
+  action: z.enum(['request', 'withdraw', 'approve', 'decline', 'revoke']),
+});
+export const AccessChangeResponse = z.object({ access: Access });
+
+/** `YYYY-MM`, a Beijing calendar month. */
+export const Month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
+
+export const MyDocumentsQuery = z.object({ month: Month });
 
 export const MyDocumentList = z.object({
   documents: z.array(

@@ -69,7 +69,8 @@ export async function recordActivity(
       );
     recent = row?.n ?? 1;
   }
-  const rule = triggeredRule(kind, recent);
+  const limit = detail?.limit;
+  const rule = triggeredRule(kind, recent, typeof limit === 'string' ? limit : undefined);
   if (rule) await raiseAlert(ctx, user, rule);
 }
 

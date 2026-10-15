@@ -1,25 +1,38 @@
 import { describe, expect, it } from 'vitest';
+import { LOGIN_FAILURE_WARNING, NEW_DEVICE_WARNING } from '@diary/shared';
 import {
-  LOGIN_FAILURE_BURST,
-  NEW_DEVICE_BURST,
   triggeredRule,
   windowFor,
   type ActivityKind,
 } from '../../../src/domain/limits/attention.js';
 
 describe('attention rules', () => {
-  it('reaching any limit flags the account at once', () => {
-    expect(triggeredRule('limit_reached', 1)).toBe('limit_reached');
+  it.each(['create', 'submit', 'update'])(
+    'reaching the daily %s cap flags the account',
+    (limit) => {
+      expect(triggeredRule('limit_reached', 1, limit)).toBe('limit_reached');
+    },
+  );
+
+  it.each(['chars', 'images', undefined])(
+    'a per-entry refusal (%s) is not a warning sign: honest writers meet it',
+    (limit) => {
+      expect(triggeredRule('limit_reached', 1, limit)).toBeNull();
+    },
+  );
+
+  it('reaching a daily warning level flags the account', () => {
+    expect(triggeredRule('elevated_activity', 1)).toBe('elevated_activity');
   });
 
   it('failed logins flag the account only at the burst threshold', () => {
-    expect(triggeredRule('login_failed', LOGIN_FAILURE_BURST.count - 1)).toBeNull();
-    expect(triggeredRule('login_failed', LOGIN_FAILURE_BURST.count)).toBe('login_failures');
+    expect(triggeredRule('login_failed', LOGIN_FAILURE_WARNING.count - 1)).toBeNull();
+    expect(triggeredRule('login_failed', LOGIN_FAILURE_WARNING.count)).toBe('login_failures');
   });
 
   it('new devices flag the account only at the burst threshold', () => {
-    expect(triggeredRule('new_device', NEW_DEVICE_BURST.count - 1)).toBeNull();
-    expect(triggeredRule('new_device', NEW_DEVICE_BURST.count)).toBe('new_devices');
+    expect(triggeredRule('new_device', NEW_DEVICE_WARNING.count - 1)).toBeNull();
+    expect(triggeredRule('new_device', NEW_DEVICE_WARNING.count)).toBe('new_devices');
   });
 
   it.each<ActivityKind>([

@@ -10,6 +10,8 @@ export const ActivityKind = z.enum([
   'entry_updated',
   'count_entry',
   'limit_reached',
+  /** A daily warning level was reached; detail {usage, count}. */
+  'elevated_activity',
   'login',
   'login_failed',
   'new_device',
@@ -17,7 +19,12 @@ export const ActivityKind = z.enum([
 ]);
 export type ActivityKind = z.infer<typeof ActivityKind>;
 
-export const AlertRule = z.enum(['limit_reached', 'login_failures', 'new_devices']);
+export const AlertRule = z.enum([
+  'limit_reached',
+  'elevated_activity',
+  'login_failures',
+  'new_devices',
+]);
 export type AlertRule = z.infer<typeof AlertRule>;
 
 export const ActivityEvent = z.object({

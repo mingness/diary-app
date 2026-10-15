@@ -138,7 +138,8 @@ Each screen lists what it needs from the API. The API column feeds the ARCHITECT
   translate buttons).
 - **Owner actions:** 編輯 (opens 4.3), and the share request toggle.
 - **Open Diary tab:** the same screen without the owner actions, reached from a list of open entries by month.
-- **API:** `GET documents/:id` → content + submitted comments `{id, authorName, submittedAt, body}`;
+- **API:** `GET documents/:id` → `view` (`owner` / `leader`) + content + submitted comments
+  `{id, authorName, submittedAt, body}` (`authorName` null for a former leader; the owner also gets `isNew`);
   `POST translate {documentId|commentId, direction}`.
 
 ### 4.5 報數 (all)
@@ -182,7 +183,8 @@ Three panes, which stack on narrow screens:
 
 - **On a phone:** 批閱 is calendar + day list; tapping an entry opens the reading pane full screen.
 - **開放申請 tab:** a queue of pending requests, oldest first, each opening the reading pane.
-- **Leaders' own diaries:** under 我的日記, identical to 4.2.
+- **Leaders' own diaries:** under 我的日記, identical to 4.2. They also appear in the review lists like anyone's,
+  and the leader may comment on and approve them there.
 - **API:** `GET leader/calendar?month=` → `{date: count}`; `GET leader/documents?date=&page=&size=` and
   `?user=&month=` → per entry `id, title, authorName, myCommentState, otherLeaderCommented, access`;
   `GET leader/users?month=` → names + counts; `GET leader/open-requests`; `PUT comments/mine`;

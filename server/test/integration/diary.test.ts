@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import {
   DAILY_LIMITS,
+  DAILY_WARNINGS,
   ENTRY_LIMITS,
   ErrorBody,
   MeResponse,
@@ -189,18 +190,15 @@ describe('privacy', () => {
     expect(rowA!.dekWrapped.equals(rowB!.dekWrapped)).toBe(false);
   });
 
-  it('nobody but the owner can read an entry yet (leaders and readers arrive in slices 6 and 7)', async () => {
+  it("only the owner writes an entry; another user can't even see a private one", async () => {
     const owner = await writer();
     const { id } = doc(await create(owner, { title: 'mine' }));
     await submit(owner, id, 'mine', '<p>x</p>');
-    for (const other of [await writer(), await writer('COURSE_LEADER')]) {
-      for (const res of [
-        await read(other, id),
-        await draft(other, id, 'hijack', '<p>x</p>'),
-        await submit(other, id, 'hijack', '<p>x</p>'),
-      ]) {
-        expect(res.statusCode).toBe(404);
-      }
+    const other = await writer();
+    expect((await read(other, id)).statusCode).toBe(404);
+    for (const who of [other, await writer('COURSE_LEADER')]) {
+      expect((await draft(who, id, 'hijack', '<p>x</p>')).statusCode).toBe(404);
+      expect((await submit(who, id, 'hijack', '<p>x</p>')).statusCode).toBe(404);
     }
     expect(doc(await read(owner, id)).submitted?.title).toBe('mine');
   });
@@ -265,13 +263,19 @@ describe('daily limits (spec §5.5)', () => {
     expect((await create(w, { title: 'tomorrow' })).statusCode).toBe(201);
   });
 
-  it('counts atomically: many simultaneous creates never exceed the limit', async () => {
+  it('counts atomically: many simultaneous creates never exceed the limit, and warn once', async () => {
     const w = await writer();
     const results = await Promise.all(
       Array.from({ length: DAILY_LIMITS.create + 8 }, () => create(w, { title: 'rush' })),
     );
     expect(results.filter((r) => r.statusCode === 201)).toHaveLength(DAILY_LIMITS.create);
     expect(results.filter((r) => r.statusCode === 409)).toHaveLength(8);
+    // And exactly one of them reached the warning level.
+    const warnings = await t.ctx.db
+      .select()
+      .from(activityEvents)
+      .where(and(eq(activityEvents.userId, w.id), eq(activityEvents.kind, 'elevated_activity')));
+    expect(warnings).toHaveLength(1);
   });
 
   it(`allows ${DAILY_LIMITS.update} updates a day; a refused one keeps the submitted text and flags the account`, async () => {
@@ -284,13 +288,46 @@ describe('daily limits (spec §5.5)', () => {
     const refused = await submit(w, id, 'u', '<p>one more</p>');
     expect(code(refused)).toMatchObject({ code: 'limit_reached', details: { limit: 'update' } });
     expect(doc(await read(w, id)).submitted?.body).toBe(`<p>${DAILY_LIMITS.update}</p>`);
+    // The warning level came first; the cap is its own flag.
     const flags = await t.ctx.db.select().from(alerts).where(eq(alerts.userId, w.id));
-    expect(flags.map((a) => a.rule)).toEqual(['limit_reached']);
+    expect(flags.map((a) => a.rule).sort()).toEqual(['elevated_activity', 'limit_reached']);
     const [event] = await t.ctx.db
       .select()
       .from(activityEvents)
       .where(and(eq(activityEvents.userId, w.id), eq(activityEvents.kind, 'limit_reached')));
     expect(event!.detail).toEqual({ limit: 'update' });
+  });
+});
+
+describe('daily warning levels (spec §5.5)', () => {
+  it(`flags the account once, at the ${DAILY_WARNINGS.create}th new entry of the day, without refusing anything`, async () => {
+    const w = await writer();
+    const flags = () => t.ctx.db.select().from(alerts).where(eq(alerts.userId, w.id));
+    for (let i = 1; i < DAILY_WARNINGS.create; i++) await create(w, { title: `e${i}` });
+    expect(await flags()).toEqual([]);
+    expect((await create(w, { title: 'warn' })).statusCode).toBe(201);
+    expect((await create(w, { title: 'past it' })).statusCode).toBe(201);
+    expect((await flags()).map((a) => a.rule)).toEqual(['elevated_activity']);
+    const events = await t.ctx.db
+      .select()
+      .from(activityEvents)
+      .where(and(eq(activityEvents.userId, w.id), eq(activityEvents.kind, 'elevated_activity')));
+    expect(events.map((e) => e.detail)).toEqual([
+      { usage: 'create', count: DAILY_WARNINGS.create },
+    ]);
+  });
+
+  it('a per-entry refusal (too long, too many photos) is logged but does not flag the account', async () => {
+    const w = await writer();
+    const { id } = doc(await create(w, { title: 'long' }));
+    await submit(w, id, 'long', `<p>${'念'.repeat(ENTRY_LIMITS.chars + 1)}</p>`);
+    await draft(w, id, 'long', png(10).repeat(ENTRY_LIMITS.images + 1));
+    expect(await t.ctx.db.select().from(alerts).where(eq(alerts.userId, w.id))).toEqual([]);
+    const refusals = await t.ctx.db
+      .select()
+      .from(activityEvents)
+      .where(and(eq(activityEvents.userId, w.id), eq(activityEvents.kind, 'limit_reached')));
+    expect(refusals.map((e) => e.detail)).toEqual([{ limit: 'chars' }, { limit: 'images' }]);
   });
 });
 

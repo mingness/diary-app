@@ -72,7 +72,9 @@ export * from './auth.js';
 export * from './admin.js';
 export * from './activity.js';
 export * from './limits.js';
+export * from './warning-levels.js';
 export * from './diary.js';
+export * from './leader.js';
 
 /** Header that must carry the session's CSRF token on every request that changes something. */
 export const CSRF_HEADER = 'x-csrf-token';

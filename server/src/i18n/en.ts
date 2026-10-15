@@ -9,7 +9,8 @@ export const en: ServerStrings = {
   alertSubject: (username) => `Account needs attention: ${username}`,
   alertIntro: (username) => `The account "${username}" was flagged:`,
   rule: {
-    limit_reached: 'Reached a daily or per-entry limit.',
+    limit_reached: 'Reached a daily cap; a request was refused.',
+    elevated_activity: 'Unusually busy today (reached a warning level).',
     login_failures: 'Many failed sign-ins within an hour.',
     new_devices: 'Signed in from several new devices within a day.',
   },

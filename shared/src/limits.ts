@@ -1,6 +1,10 @@
 /**
- * Usage limits (spec §5.5, D21). One source of truth: the editor shows counters from these values and the
- * server enforces the same ones.
+ * Usage caps (spec §5.5, D21): requests beyond these are refused. One source of truth: the editor shows
+ * counters from these values and the server enforces the same ones. The levels that only warn a SYS_ADMIN are
+ * in `warning-levels.ts`.
+ *
+ * Why there are limits at all: to stop a hijacked account flooding the app, to keep the leaders' reading load
+ * manageable, and to keep entries focused. The per-entry limits apply to leaders' comments too.
  */
 
 /** Per user, per Beijing calendar date; they reset at midnight Beijing time. */
@@ -41,3 +45,6 @@ export function visibleCharCount(text: string): number {
 }
 
 export type LimitName = DailyLimitKind | 'images' | 'chars';
+
+/** The daily counters kept per user (`daily_usage`): the capped kinds, plus comments, which only warn. */
+export type UsageKind = DailyLimitKind | 'comment';

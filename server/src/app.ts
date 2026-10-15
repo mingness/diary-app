@@ -30,6 +30,7 @@ import { adminDocumentRoutes } from './routes/admin-documents.js';
 import { adminUserRoutes } from './routes/admin-users.js';
 import { authRoutes, DEFAULT_AUTH_LIMITS, type AuthLimits } from './routes/auth.js';
 import { documentRoutes } from './routes/documents.js';
+import { leaderRoutes } from './routes/leader.js';
 import { healthRoutes } from './routes/health.js';
 import { meRoutes } from './routes/me.js';
 
@@ -163,6 +164,7 @@ export async function buildApp({
   adminActivityRoutes(app, ctx);
   adminDocumentRoutes(app, ctx);
   documentRoutes(app, ctx);
+  leaderRoutes(app, ctx);
 
   return app;
 }

@@ -20,7 +20,8 @@ export const zhHant: ServerStrings = {
   alertSubject: (username) => `帳戶需要注意：${username}`,
   alertIntro: (username) => `帳戶「${username}」已被標記：`,
   rule: {
-    limit_reached: '已達每日或單篇上限。',
+    limit_reached: '已達每日上限，有操作被拒絕。',
+    elevated_activity: '今日活動量偏高（已達警示門檻）。',
     login_failures: '一小時內多次登入失敗。',
     new_devices: '一天內從多個新裝置登入。',
   },

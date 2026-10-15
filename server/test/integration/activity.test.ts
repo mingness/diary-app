@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { eq, sql } from 'drizzle-orm';
 import { ActivityList, ActivitySummary, AlertList, AlertStatus, ErrorBody } from '@diary/shared';
 import { activityEvents, alerts, users } from '../../src/db/schema.js';
-import { LOGIN_FAILURE_BURST } from '../../src/domain/limits/attention.js';
+import { LOGIN_FAILURE_WARNING } from '@diary/shared';
 import { recordActivity } from '../../src/services/activity.js';
 import { adminLock } from '../../src/services/admin-users.js';
 import {
@@ -139,9 +139,9 @@ describe('activity events from signing in', () => {
 });
 
 describe('Attention rules', () => {
-  it(`flags an account after ${LOGIN_FAILURE_BURST.count} failed logins within an hour, once`, async () => {
+  it(`flags an account after ${LOGIN_FAILURE_WARNING.count} failed logins within an hour, once`, async () => {
     const u = await newUser();
-    for (let i = 0; i < LOGIN_FAILURE_BURST.count - 1; i++) {
+    for (let i = 0; i < LOGIN_FAILURE_WARNING.count - 1; i++) {
       await recordActivity(t.ctx, u, 'login_failed', { reason: 'password' });
     }
     expect(await openAlertsFor(u.id)).toHaveLength(0);
@@ -153,7 +153,7 @@ describe('Attention rules', () => {
 
   it('failures spread over more than an hour do not flag', async () => {
     const u = await newUser();
-    for (let i = 0; i < LOGIN_FAILURE_BURST.count; i++) {
+    for (let i = 0; i < LOGIN_FAILURE_WARNING.count; i++) {
       await recordActivity(t.ctx, u, 'login_failed', { reason: 'password' });
       t.clock.advance(7 * MINUTE);
     }
@@ -168,7 +168,7 @@ describe('Attention rules', () => {
     expect((await openAlertsFor(u.id)).map((a) => a.rule)).toEqual(['new_devices']);
   });
 
-  it('flags any limit reached at once, and a handled flag can be raised again', async () => {
+  it('flags a daily cap reached at once, and a handled flag can be raised again', async () => {
     const u = await newUser();
     await recordActivity(t.ctx, u, 'limit_reached', { limit: 'submit' });
     const [first] = await openAlertsFor(u.id);
@@ -309,7 +309,7 @@ describe('alert emails', () => {
     mailer.sent.length = 0;
     const u = await newUser();
     await recordActivity(t.ctx, u, 'limit_reached', { limit: 'submit' });
-    for (let i = 0; i < LOGIN_FAILURE_BURST.count; i++) {
+    for (let i = 0; i < LOGIN_FAILURE_WARNING.count; i++) {
       await recordActivity(t.ctx, u, 'login_failed', { reason: 'password' });
     }
     await sendPendingAlertEmails(t.ctx);
@@ -317,7 +317,7 @@ describe('alert emails', () => {
     expect(mine).toHaveLength(1);
     expect(mine[0]!.to).toEqual(['admin@example.com']);
     expect(mine[0]!.subject).toMatch(/修行日記.*Account needs attention/);
-    expect(mine[0]!.text).toContain('已達每日或單篇上限');
+    expect(mine[0]!.text).toContain('已達每日上限');
     expect(mine[0]!.text).toContain('Many failed sign-ins');
     expect(mine[0]!.text.indexOf('已達')).toBeLessThan(mine[0]!.text.indexOf('Reached'));
     for (const secret of ['秘密姓', 'Hidden Road']) expect(mine[0]!.text).not.toContain(secret);

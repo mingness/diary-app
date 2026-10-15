@@ -2,16 +2,18 @@
  * Development and test data (spec §11). Never runs in production; passwords and authenticator secrets are
  * throwaway. Entries are written through the real diary service, so they're encrypted exactly as real ones,
  * and dated over the past two weeks so calendars and month lists have something to show.
- *
- * Comments arrive with the comment API (delivery slice 6) and are seeded from then on.
+ * Sharing goes through the real state machine (the owner asks, a leader approves), and comments through the
+ * comment service.
  */
 import { eq, sql } from 'drizzle-orm';
 import type { Access, Profile, Role } from '@diary/shared';
 import type { AppContext } from '../context.js';
-import { documents, users } from '../db/schema.js';
+import { users } from '../db/schema.js';
 import { generateTotpSecret } from '../domain/auth/totp.js';
 import { AdminToolError, enableTotp } from './admin-tools.js';
+import { saveMyComment } from './diary/comments.js';
 import { createDocument, saveDraft, submitDocument } from './diary/documents.js';
+import { changeAccess } from './sharing.js';
 import { createUser, type UserRow } from './users.js';
 
 export const SEED_PASSWORD = 'password123';
@@ -55,9 +57,19 @@ interface SeedEntry {
   /** A pending draft after the submissions (or the only content, for an entry never submitted). */
   readonly draft?: string;
   readonly access?: Access;
+  readonly comments?: readonly SeedComment[];
 }
 
-/** Every state the spec's seed list asks for (§11): open, two waiting, a draft, a submitted-then-drafted. */
+interface SeedComment {
+  readonly leader: string;
+  readonly state: 'draft' | 'submitted';
+  readonly body: string;
+}
+
+/**
+ * Every state the spec's seed list asks for (§11): open, two waiting, a draft, a submitted-then-drafted, and
+ * comments in draft and submitted state from different leaders.
+ */
 export const SEED_ENTRIES: readonly SeedEntry[] = [
   {
     owner: 'chenmd',
@@ -72,6 +84,14 @@ export const SEED_ENTRIES: readonly SeedEntry[] = [
     title: '念佛一小時',
     submissions: [p('晚上在家念佛一小時，用計數器記了一千零八十聲。')],
     access: 'open',
+    comments: [
+      {
+        leader: 'leader.lin',
+        state: 'submitted',
+        body: p('能夠持續一小時很好，數目之外，也留意心是否清楚。'),
+      },
+      { leader: 'leader.huang', state: 'submitted', body: p('隨喜。可以試試聽著自己的念佛聲。') },
+    ],
   },
   {
     owner: 'chenmd',
@@ -89,6 +109,13 @@ export const SEED_ENTRIES: readonly SeedEntry[] = [
       p('早課時一直打瞌睡，後來站起來繞佛才清醒。'),
       p('早課時一直打瞌睡，後來站起來繞佛才清醒。<b>明天早點睡。</b>'),
     ],
+    comments: [
+      {
+        leader: 'leader.lin',
+        state: 'submitted',
+        body: p('繞佛是好方法。早睡早起，功課自然穩定。'),
+      },
+    ],
   },
   {
     owner: 'chenmd',
@@ -96,6 +123,7 @@ export const SEED_ENTRIES: readonly SeedEntry[] = [
     title: '第一次參加共修',
     submissions: [p('第一次參加共修，人很多，有點緊張。')],
     draft: p('第一次參加共修，人很多，有點緊張。結束後師兄請我喝茶。'),
+    comments: [{ leader: 'leader.huang', state: 'draft', body: p('歡迎你來共修，') }],
   },
   {
     owner: 'zhangsf',
@@ -109,6 +137,10 @@ export const SEED_ENTRIES: readonly SeedEntry[] = [
     daysAgo: 0,
     title: '讀經筆記',
     submissions: [p('今天讀《心經》，對「心無罣礙」有新的體會。')],
+    comments: [
+      { leader: 'leader.lin', state: 'draft', body: p('可以多寫一些體會的內容') },
+      { leader: 'leader.huang', state: 'submitted', body: p('讀經後能有體會，很難得。') },
+    ],
   },
   {
     owner: 'wuml',
@@ -121,8 +153,15 @@ export const SEED_ENTRIES: readonly SeedEntry[] = [
     daysAgo: 3,
     title: '帶共修的反思',
     submissions: [p('今晚帶共修，提醒自己少說話，多聆聽。')],
+    comments: [{ leader: 'leader.huang', state: 'submitted', body: p('多聆聽，說得好。') }],
   },
 ];
+
+function seededLeader(created: ReadonlyMap<string, UserRow>, username: string): UserRow {
+  const leader = created.get(username);
+  if (leader?.role !== 'COURSE_LEADER') throw new Error(`seed: ${username} is not a seeded leader`);
+  return leader;
+}
 
 export interface SeedResult {
   readonly users: { username: string; role: Role; totpSecret?: string; resetPending: boolean }[];
@@ -191,12 +230,17 @@ export async function seed(ctx: AppContext, options: { reset: boolean }): Promis
         await saveDraft(dayCtx, owner.id, document.id, { title: entry.title, body: entry.draft });
       }
     }
-    if (entry.access) {
-      // The sharing API arrives in slice 7; set the state directly for now.
-      await ctx.db
-        .update(documents)
-        .set({ access: entry.access })
-        .where(eq(documents.id, document.id));
+    if (entry.access === 'wait_for_open' || entry.access === 'open') {
+      await changeAccess(dayCtx, owner, document.id, 'request');
+    }
+    if (entry.access === 'open') {
+      await changeAccess(dayCtx, seededLeader(created, 'leader.lin'), document.id, 'approve');
+    }
+    for (const comment of entry.comments ?? []) {
+      await saveMyComment(dayCtx, seededLeader(created, comment.leader), document.id, {
+        body: comment.body,
+        state: comment.state,
+      });
     }
   }
   return { users: result, entries: SEED_ENTRIES.length };

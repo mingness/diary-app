@@ -31,6 +31,19 @@ export function beijingDayRange(date: string): { start: Date; end: Date } {
 }
 
 /**
+ * The first date of the calendar month `YYYY-MM` and the first date of the next one (exclusive end), for
+ * date-column queries.
+ */
+export function monthDates(month: string): { first: string; next: string } {
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(month);
+  if (!match) throw new RangeError(`Not a month: ${month}`);
+  const year = Number(match[1]);
+  const mon = Number(match[2]);
+  const next = mon === 12 ? `${year + 1}-01` : `${year}-${String(mon + 1).padStart(2, '0')}`;
+  return { first: `${month}-01`, next: `${next}-01` };
+}
+
+/**
  * The next time strictly after `now` at which the Beijing clock reads `hour`:00. Running at exactly 02:00
  * schedules the following day's run, so a job that finishes instantly can't fire twice.
  */

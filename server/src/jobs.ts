@@ -1,12 +1,12 @@
 /** The scheduled jobs this server runs (docs/ARCHITECTURE.md §8.9; the 報數 job joins in slice 9). */
 import { and, isNotNull, lt, or } from 'drizzle-orm';
 import type { AppContext } from './context.js';
-import { activityEvents, captchas, sessions } from './db/schema.js';
+import { activityEvents, captchas, readAudit, sessions } from './db/schema.js';
 import { sendDailySummary, sendPendingAlertEmails } from './services/alerts.js';
 import type { Job } from './scheduler.js';
 
 const DAY = 24 * 60 * 60 * 1000;
-/** Activity events are kept 90 days (spec §6.5.5). */
+/** Activity events, and the leaders' read audit, are kept 90 days (spec §6.5.5). */
 export const ACTIVITY_RETENTION_MS = 90 * DAY;
 /** Ended sessions stay listed a while so a user can see recent sign-outs, then go. */
 export const ENDED_SESSION_RETENTION_MS = 30 * DAY;
@@ -18,6 +18,10 @@ export async function purgeExpired(ctx: AppContext): Promise<Record<string, numb
     .delete(activityEvents)
     .where(lt(activityEvents.createdAt, new Date(now - ACTIVITY_RETENTION_MS)))
     .returning({ id: activityEvents.id });
+  const reads = await ctx.db
+    .delete(readAudit)
+    .where(lt(readAudit.readAt, new Date(now - ACTIVITY_RETENTION_MS)))
+    .returning({ id: readAudit.id });
   const cutoff = new Date(now - ENDED_SESSION_RETENTION_MS);
   const ended = await ctx.db
     .delete(sessions)
@@ -32,7 +36,12 @@ export async function purgeExpired(ctx: AppContext): Promise<Record<string, numb
     .delete(captchas)
     .where(lt(captchas.expiresAt, new Date(now)))
     .returning({ id: captchas.id });
-  return { events: events.length, sessions: ended.length, captchas: oldCaptchas.length };
+  return {
+    events: events.length,
+    reads: reads.length,
+    sessions: ended.length,
+    captchas: oldCaptchas.length,
+  };
 }
 
 export const JOBS: readonly Job[] = [

@@ -133,7 +133,7 @@ documents
   CHECKs: ciphertext/nonce pairs set together; content exists iff first_submitted_at is set; only submitted
   entries can be anything but private
   access ENUM(private, wait_for_open, open)
-  access_decided_by FK users NULL, access_decided_at NULL
+  access_decided_by FK users NULL, access_decided_at NULL   -- last sharing change; for a waiting entry, the request
   dek_wrapped, key_version
   created_at, updated_at
   INDEX (diary_date) WHERE first_submitted_at IS NOT NULL, INDEX (owner_id, diary_date), INDEX (access)
@@ -155,13 +155,13 @@ count_entries
 count_settings
   user_id PK, auto_submit BOOL, saved_count INT CHECK (0..1080), updated_at
 
-daily_usage                               -- counters for the daily limits (D21); survive deletes, so an admin delete refunds nothing
-  user_id FK CASCADE, day DATE, kind ENUM(create, submit, update), n INT
+daily_usage                               -- counters for the daily caps and warning levels (D21, D28); survive deletes, so an admin delete refunds nothing
+  user_id FK CASCADE, day DATE, kind ENUM(create, submit, update, comment), n INT   -- comment: warn only, no cap
   PRIMARY KEY (user_id, day, kind)        -- checked and incremented in the same transaction as the write
 
 activity_events                           -- metadata only, never content; kept 90 days; never shown to the user it describes
   id, user_id FK SET NULL, username       -- username kept so events survive the user's deletion
-  kind                                    -- entry_created/submitted/updated, count_entry, limit_reached,
+  kind                                    -- entry_created/submitted/updated, count_entry, limit_reached, elevated_activity,
                                           -- login, login_failed, new_device, password_changed
   detail JSONB NULL                       -- e.g. {limit: "submit"}; no content, titles or profile fields
   created_at
@@ -183,8 +183,9 @@ sessions
   csrf_token, mfa ENUM(not_required, pending, enrolment_required, verified)
   created_at, last_seen_at, expires_at, revoked_at NULL
 
-read_audit                                -- security log only; never shown to diary owners
-  leader_id, document_id, read_at
+read_audit                                -- security log only; never shown to diary owners; kept 90 days
+  id, leader_id FK SET NULL, leader_username, document_id FK CASCADE, read_at
+                                          -- one row per leader read of an entry or its history
 
 captchas
   id, answer_hash (HMAC under SESSION_SECRET), expires_at   -- single use, 5 minutes
@@ -254,7 +255,7 @@ using `actor.role`, `isOwner`, and the document's `first_submitted_at` and `acce
 
 ```
 owner:   private ──request──► wait_for_open ──withdraw──► private
-leader:  wait_for_open ──approve (confirm dialog)──► open
+leader:  wait_for_open ──approve (confirm dialog)──► open      (any leader, on their own entries too)
 leader:  wait_for_open ──decline──► private
 either:  open ──revoke──► private
 ```
@@ -274,12 +275,12 @@ bodies are ignored.
 | `GET /api/documents/open?month=` | – | ✅ | ✅ | ❌ |
 | `GET /api/documents/:id`, `/:id/versions` | – | per §7.1 | per §7.1 | ❌ |
 | `POST /api/documents/:id/access` (`request`/`withdraw`/`revoke`) | – | own | own | ❌ |
-| `POST /api/documents/:id/access` (`approve`/`decline`/`revoke`) | – | ❌ | ✅ submitted, not own | ❌ |
+| `POST /api/documents/:id/access` (`approve`/`decline`/`revoke`) | – | ❌ | ✅ submitted, own included | ❌ |
 | `GET /api/leader/documents?date=&page=&size=` and `?user=&month=` → per entry `myCommentState, otherLeaderCommented, access` | – | ❌ | ✅ submitted only | ❌ |
 | `GET /api/leader/calendar?month=` → submitted-entry count per day | – | ❌ | ✅ | ❌ |
 | `GET /api/leader/open-requests` | – | ❌ | ✅ | ❌ |
 | `GET /api/leader/users?month=` → names + entries this month | – | ❌ | ✅ | ❌ |
-| `PUT /api/documents/:id/comments/mine` (`{body, state}`) | – | ❌ | ✅ submitted, not own | ❌ |
+| `PUT /api/documents/:id/comments/mine` (`{body, state}`) | – | ❌ | ✅ submitted, own included | ❌ |
 | `GET /api/admin/users?q=&role=&status=&page=&size=`; `GET /api/admin/users/:id` | – | ❌ | ❌ | ✅ incl. decrypted profiles |
 | `POST /api/admin/users`; `PATCH /api/admin/users/:id` (role, email, profile; never username) | – | ❌ | ❌ | ✅ not demoting the last SYS_ADMIN |
 | `DELETE /api/admin/users/:id`; `POST /api/admin/users/batch-delete` (NORMAL_USER only) | – | ❌ | ❌ | ✅ not yourself, not the last SYS_ADMIN |
@@ -297,7 +298,8 @@ Translate takes an **id**, not free text. The server checks read access and decr
 keeps the endpoint from becoming a free LLM proxy.
 
 Because each account has exactly one role, separation of duties is automatic: a SYS_ADMIN account can never read
-diaries. A leader's own entries are governed by the owner rows; the leader rows never apply to their own entries.
+diaries. A leader's own entries follow the owner rows and the leader rows alike: leaders may comment on and decide sharing
+for any submitted entry, their own included, and the review lists include their own entries.
 
 ## 8. Feature design notes
 
@@ -364,7 +366,8 @@ diaries. A leader's own entries are governed by the owner rows; the leader rows 
   - Submitting exactly what is already submitted (same title and body) changes nothing and counts nothing, so
     a double click is harmless.
   - A refused write returns `LIMIT_REACHED` with `{limit, resetsAt}` (409), records a `limit_reached` activity
-    event and raises an alert.
+    event, and raises an alert only for a daily cap (D28). Warning levels below the caps flag without refusing
+    (§8.9).
   - No storage quota. `storageBytes` is the sum of the user's ciphertext sizes (content, draft, versions,
     comments on their entries, profile), computed on request; cache it only if it proves slow.
 - **Deleting (D24):** users can't delete entries. Only a SYS_ADMIN deletes, immediately, cascading to
@@ -373,6 +376,15 @@ diaries. A leader's own entries are governed by the owner rows; the leader rows 
   again later. The owner and permitted readers see all submitted comments, each labelled with its leader's name.
   A submitted comment the owner hasn't opened yet (`seen_by_owner_at` is NULL) shows as new and raises the
   有新批注 toast.
+  - A comment has one body and one state, so saving a submitted comment as a draft takes it back out of the
+    owner's view until it is submitted again. Resubmitting changed text marks it new for the owner again;
+    resubmitting identical text changes nothing.
+  - Comments have the entry's per-entry limits (D21): 2 photos, image and body byte caps, and 5,000 visible
+    characters on submit (a draft may be longer). Refusals are recorded as for entries, and
+    submitted comments count toward the daily comment warning level (D28). A submitted comment also needs some visible text or a photo.
+  - The owner's `GET /api/documents/:id` returns submitted comments with `isNew` and then marks exactly those
+    seen. A leader's own comment is always `myComment`, never one of `comments`, in either view; on their own
+    entry it is never marked new.
 
 ### 8.4 Pages
 
@@ -429,14 +441,18 @@ follows §9, with a SHA-256 check and signer-match check before installing (§12
   when the account hasn't signed in from the same coarse device label in 90 days. Metadata only: the same rule as
   logging (no content, comments, titles or profile fields), with a test that greps events for seeded
   plaintext. A nightly job deletes events older than 90 days. PRIVACY.md says what is recorded and for how long.
-- **Attention rules** (pure, in `domain/limits`, thresholds as constants to tune after real use): any
-  `limit_reached`; a burst of `login_failed` for one username; several `new_device` events in one day. A rule
+- **Attention rules** (pure, in `domain/limits/attention.ts`; the thresholds are constants in
+  `shared/src/warning-levels.ts`, to tune after real use): a `limit_reached` for a daily cap (not the per-entry
+  limits, which honest writers meet); `elevated_activity`, a daily warning level reached (D28); a burst of
+  `login_failed` for one username; several `new_device` events in one day. A rule
   that fires creates one `alerts` row, not one per event, while an unhandled alert for the same user and rule
   exists.
 - **In-app first:** the Attention list (badge with the unhandled count) is always on and is the source of
   truth. It works with no email configured.
 - **Thresholds (initial):** 10 failed logins for one username within an hour; 3 new devices within 24 hours;
-  any limit reached. Constants in `server/src/domain/limits/attention.ts`.
+  per day 10 creates, 10 first submissions, 25 updates, 40 submitted comments. A daily warning is counted in
+  `daily_usage` with the write and fires on the write whose count lands exactly on the level, so concurrent
+  writes produce one event; the route records it after the commit. All in `shared/src/warning-levels.ts`.
 - **Locking** can't target yourself, and two admins locking each other at once can't leave nobody able to
   sign in (admin rows are locked and counted in one transaction, as for demotion).
 - **Email, optional:** when `SMTP_URL` is set, a scheduler task sends unsent alerts to every SYS_ADMIN's account
@@ -518,8 +534,10 @@ its entries in the API explorer (D20), so it can be checked by hand before any s
    from the OpenAPI document). *(Done. The comments table exists already, so list counts are real; the
    comment API arrives in slice 6. Until slices 6–7 add the leader and reader views, an entry answers 404 to
    anyone but its owner.)*
-6. **Leader API:** lists, calendar counts, comments, open approvals, read audit.
-7. **Open diaries and sharing API.**
+6. **Leader API:** lists, calendar counts, comments, open approvals, read audit. *(Done. The whole sharing
+   endpoint `POST /api/documents/:id/access` arrived here, owner actions included, because approvals need
+   requests and the seed now goes through it.)*
+7. **Open diaries API:** the month list of open entries and the reader view of an open entry.
 8. **Account API:** profile, password change, devices, preferences.
 9. **報數 API:** summary, latest, settings, count date and per-date limit, admin list, delete by date range,
    scheduler, job runs.
@@ -565,7 +583,7 @@ Each slice ships with tests, both languages where it has UI, permission tests pe
 | D13 | 报数 scope | **Agreed**: app-wide |
 | D14 | Show owners who read their entry | **Agreed: no**. The read audit stays internal |
 | D18 | A leader account is deleted | **Agreed**: submitted comments stay, labelled "former leader"; drafts are deleted |
-| D19 | Can a COURSE_LEADER keep a diary? | **Agreed: yes**. Other leaders read and comment on it; a leader never comments on or approves their own entry |
+| D19 | Can a COURSE_LEADER keep a diary? | **Agreed: yes**. Other leaders read and comment on it. Changed 2026-10-15: a leader may also comment on and approve sharing for their own entry, so the leader rules have no own-entry exception |
 | D20 | API explorer for checking the backend by hand | **Agreed**: `@fastify/swagger` + `@fastify/swagger-ui` + `fastify-type-provider-zod` (OpenAPI from the zod schemas; assets bundled, no CDN). On by default outside production, off in production; staging sets `API_DOCS=true` |
 | D21 | Usage limits against a hijacked account | **Agreed**: per user per day 20 creates, 20 first submissions, 50 updates; per entry 2 photos and 5,000 characters (framed as care for the reading leader); 10 manual count entries per count date. §8.3, §8.5 |
 | D22 | Entry dates and the submit button | **Agreed**: date = creation date, set by the server; several entries per date; no backdating. 提交 for the first submit, then 更新 |
@@ -574,4 +592,5 @@ Each slice ships with tests, both languages where it has UI, permission tests pe
 | D25 | Storage quota | **Agreed: none**. Daily limits and image caps bound storage; usage is shown to the user and to SYS_ADMINs |
 | D26 | Spotting odd behaviour | **Agreed**: metadata-only activity log (90 days), Attention list with simple rules, sign-out-all, lock, delete counts by date range. §8.9 |
 | D27 | Alerting SYS_ADMINs | **Agreed**: in-app Attention list always; email via SMTP (`nodemailer`, approved) from a QQ/163 mailbox when `SMTP_URL` is set. Web Push rejected: Android push is blocked in mainland China |
+| D28 | Warning levels separate from caps | **Agreed**: limits exist to spot misuse, keep leaders' reading load manageable and keep entries lean. Caps refuse; warning levels (about half the caps, plus 40 submitted comments a day) only flag the account, once a day. Per-entry refusals no longer flag. Comments have the entry's per-entry limits. §8.3, §8.9 |
 | F1–F6 | Frontend decisions | **Agreed**: see FRONTEND.md §11 |

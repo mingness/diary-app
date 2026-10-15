@@ -69,7 +69,9 @@ Keep this file up to date when commands, conventions or pitfalls change.
   comments or profile fields; the redaction list in `server/src/logging.ts` is a backstop, not permission.
 - **Diary content** is only handled in `server/src/services/diary/`: bodies go through `inspectBody` (sanitise +
   measure) before anything else, are sealed with the entry's DEK and the matching `fieldAad` label, and are
-  never logged. Limit values come from `shared/src/limits.ts`.
+  never logged. Caps come from `shared/src/limits.ts`; the levels that only warn a SYS_ADMIN from
+  `shared/src/warning-levels.ts`. Limits exist to spot misuse, keep leaders' reading load manageable and keep
+  entries lean; keep all three in mind when changing one.
 - **The diary keyring** is only for `server/src/services/diary/`; lint enforces it (tested in
   `server/test/unit/lint-rules.test.ts`). Never work around the rule.
 - **Activity events:** record them with `recordActivity`/`recordLogin` wrapped in `safely(...)` so a logging

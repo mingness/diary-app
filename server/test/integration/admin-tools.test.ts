@@ -159,6 +159,14 @@ describe('seed entries (spec §11)', () => {
     const { rows: dump } = await t.testDb.database.pool.query<{ text: string }>(
       "SELECT string_agg(row_to_json(d)::text, '') AS text FROM documents d",
     );
+    // Comments in draft and submitted state, from different leaders (spec §11).
+    const { rows: seeded } = await t.testDb.database.pool.query<{ state: string; authors: number }>(
+      'SELECT state::text, count(DISTINCT author_id)::int AS authors FROM comments GROUP BY state',
+    );
+    expect(Object.fromEntries(seeded.map((r) => [r.state, r.authors]))).toEqual({
+      draft: 2,
+      submitted: 2,
+    });
     // Titles are plaintext by design (spec §3); bodies never are. 計數器 appears only in a seeded body.
     expect(dump[0]!.text).not.toContain('計數器');
   });

@@ -3,14 +3,9 @@
  * diary content, drafts, history or comments. Endpoints are discovered from the API's own OpenAPI document, so
  * a new admin endpoint is covered automatically without anyone remembering to add it here.
  */
-import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { API_DOCS_PATH } from '../../src/app.js';
-import { comments, documents } from '../../src/db/schema.js';
-import { sealText } from '../../src/domain/crypto/aead.js';
-import { fieldAad } from '../../src/domain/crypto/contexts.js';
-import { eq } from 'drizzle-orm';
-import { documentKey } from '../../src/services/diary/keys.js';
+import { saveMyComment } from '../../src/services/diary/comments.js';
 import { createDocument, saveDraft, submitDocument } from '../../src/services/diary/documents.js';
 import { EMPTY_PROFILE } from '../../src/services/profiles.js';
 import { createUser } from '../../src/services/users.js';
@@ -65,24 +60,9 @@ beforeAll(async () => {
     title: 'plain title',
     body: `<p>${MARKERS.draft}</p>`,
   });
-  const [row] = await t.ctx.db.select().from(documents).where(eq(documents.id, documentId));
-  const commentId = randomUUID();
-  const sealed = sealText(
-    documentKey(t.ctx, documentId, row!.dekWrapped),
-    `<p>${MARKERS.comment}</p>`,
-    fieldAad.comment(documentId, commentId),
-  );
-  const now = t.clock.now();
-  await t.ctx.db.insert(comments).values({
-    id: commentId,
-    documentId,
-    authorId: leaderId,
-    bodyCt: sealed.ciphertext,
-    bodyNonce: sealed.nonce,
+  await saveMyComment(t.ctx, leader, documentId, {
+    body: `<p>${MARKERS.comment}</p>`,
     state: 'submitted',
-    submittedAt: now,
-    createdAt: now,
-    updatedAt: now,
   });
 });
 afterAll(async () => {
@@ -94,13 +74,14 @@ interface Operation {
 }
 
 describe('SYS_ADMIN never receives diary text', () => {
-  it('positive control: the owner does see the content and draft', async () => {
+  it('positive control: the owner does see the content, draft and comment', async () => {
     const owner = await login(t.app, 'np_owner');
     const body = (
       await t.app.inject({ method: 'GET', url: `/api/documents/${documentId}`, headers: as(owner) })
     ).body;
     expect(body).toContain(MARKERS.content);
     expect(body).toContain(MARKERS.draft);
+    expect(body).toContain(MARKERS.comment);
   });
 
   it('from any GET endpoint in the API, with real IDs filled in', async () => {
@@ -174,6 +155,10 @@ describe('SYS_ADMIN document management', () => {
     const { document } = await createDocument(t.ctx, ownerId, { title: 'to delete', body: '' });
     await submitDocument(t.ctx, ownerId, document.id, { title: 'to delete', body: '<p>1</p>' });
     await submitDocument(t.ctx, ownerId, document.id, { title: 'to delete', body: '<p>2</p>' });
+    await saveMyComment(t.ctx, { id: leaderId, role: 'COURSE_LEADER' }, document.id, {
+      body: '<p>c</p>',
+      state: 'submitted',
+    });
     const res = await t.app.inject({
       method: 'DELETE',
       url: `/api/admin/documents/${document.id}`,
@@ -181,10 +166,12 @@ describe('SYS_ADMIN document management', () => {
     });
     expect(res.statusCode).toBe(200);
     const { rows } = await t.testDb.database.pool.query(
-      'SELECT (SELECT count(*) FROM documents WHERE id = $1)::int AS d, (SELECT count(*) FROM document_versions WHERE document_id = $1)::int AS v',
+      `SELECT (SELECT count(*) FROM documents WHERE id = $1)::int AS d,
+              (SELECT count(*) FROM document_versions WHERE document_id = $1)::int AS v,
+              (SELECT count(*) FROM comments WHERE document_id = $1)::int AS c`,
       [document.id],
     );
-    expect(rows[0]).toEqual({ d: 0, v: 0 });
+    expect(rows[0]).toEqual({ d: 0, v: 0, c: 0 });
   });
 
   it('is closed to everyone else', async () => {

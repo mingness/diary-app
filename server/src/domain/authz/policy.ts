@@ -110,8 +110,8 @@ export type DocumentAction = (typeof DocumentAction)[keyof typeof DocumentAction
  */
 export function canOnDocument(actor: Actor, action: DocumentAction, doc: DocumentFacts): boolean {
   const isOwner = actor.id === doc.ownerId && actor.role !== 'SYS_ADMIN';
-  // A leader acting as a leader: never on their own entry, and only once it has been submitted.
-  const asLeader = actor.role === 'COURSE_LEADER' && !isOwner && doc.submitted;
+  // Leaders act on any submitted entry, their own included (agreed 2026-10-15).
+  const asLeader = actor.role === 'COURSE_LEADER' && doc.submitted;
 
   switch (action) {
     case DocumentAction.Edit:

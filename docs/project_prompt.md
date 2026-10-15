@@ -31,7 +31,7 @@ This is a private diary platform with a supervision workflow:
 | COURSE_LEADER | one or more | Read all submitted diaries, write comments, approve sharing; may keep their own diary |
 | SYS_ADMIN | one or more (the last one cannot be deleted or demoted) | Manage users & documents (metadata only), reset passwords, administer 报数 |
 
-- Each account has exactly one role. A COURSE_LEADER may also keep their own diary, exactly like a NORMAL_USER. Other leaders read and comment on it; a leader never comments on or approves sharing for their own diary. (With only one leader, that leader's diaries cannot be opened for sharing.)
+- Each account has exactly one role. A COURSE_LEADER may also keep their own diary, exactly like a NORMAL_USER. Leaders treat it like anyone's: they (and other leaders) may comment on it and approve its sharing (after it has been requested, like anyone's).
 - SYS_ADMIN accounts must log in with a second factor (authenticator app, TOTP).
 - **Production starts empty.** The first SYS_ADMIN is created with a server command-line tool. SYS_ADMINs then create other accounts and assign roles; normal users may also self-register.
 - **Test environments** are seeded with sample accounts and diaries (§11). The seed must refuse to run against production.
@@ -128,7 +128,13 @@ Owner or any COURSE_LEADER unchecks → state = 'Private'
 - If a leader's account is deleted, their submitted comments remain, labelled as from a former leader; their unsubmitted comment drafts are deleted.
 
 ### 5.5 Limits
-Limits stop a hijacked account (stolen session, malware) from flooding the app. The daily ones are set high enough that an honest user, even one catching up on a week's entries on a Saturday, never reaches them. The per-entry ones are deliberate, and are presented kindly.
+Limits serve three purposes:
+
+1. **Spotting misuse:** they stop a hijacked account (stolen session, malware) flooding the app, and make it visible.
+2. **Keeping the leaders' reading load manageable:** every submitted entry is something a leader reads.
+3. **Keeping entries lean:** a focused entry is easier to read closely, and photos are chosen with care.
+
+The daily caps are set high enough that an honest user, even one catching up on a week's entries on a Saturday, never reaches them. The per-entry ones are deliberate, and are presented kindly.
 
 | Limit | Value | Notes |
 |---|---|---|
@@ -141,8 +147,22 @@ Limits stop a hijacked account (stolen session, malware) from flooding the app. 
 - "Day" is the Beijing calendar date; daily limits reset at midnight Beijing time.
 - **Nothing is ever lost at a limit.** A draft over 5,000 characters still saves; only 提交/更新 is blocked until it is shortened. When a daily limit is reached, the message says which limit and when it resets, and the text in the editor stays.
 - **No storage limit.** Storage is bounded by the daily limits and photo sizes. Each user sees their own usage (§4.4), and SYS_ADMINs see everyone's (§6.5).
-- Reaching any limit is recorded as an activity event and flags the account for SYS_ADMINs (§6.5).
 - The server enforces every limit; the client mirrors them so the user is warned before writing.
+- Comments (§5.4) have the same per-entry limits as entries: 2 photos, and 5,000 characters when submitted (a comment draft may be longer).
+- Every refusal is recorded as an activity event. Only reaching a **daily** cap flags the account for SYS_ADMINs (§6.5): honest writers meet the per-entry limits all the time.
+
+**Warning levels.** Separately from the caps, and well below them, warning levels flag an unusually busy day for a SYS_ADMIN without refusing anything. Each flags the account once a day, when it is first reached.
+
+| Activity | Warn at | Cap |
+|---|---|---|
+| New entries created | 10 per user per day | 20 |
+| First submissions (提交) | 10 per user per day | 20 |
+| Updates (更新) | 25 per user per day | 50 |
+| Comments submitted or resubmitted (drafts don't count) | 40 per leader per day | none |
+| Failed sign-ins for one username | 10 within an hour | sign-in blocked after 5 in 15 minutes |
+| New devices for one account | 3 within 24 hours | none |
+
+Both sets of values are constants, each in its own file so they're easy to find and change: the caps in `shared/src/limits.ts`, the warning levels in `shared/src/warning-levels.ts`.
 
 ### 5.6 Deleting entries
 - Users cannot delete their own entries (kept simple until asked for). Only a SYS_ADMIN deletes entries (§6.5), and deletion is immediate.
@@ -176,7 +196,7 @@ Limits stop a hijacked account (stolen session, malware) from flooding the app. 
 5. **Attention and activity** — for spotting a hijacked account. Everything here is **metadata only**; no diary content, comments or profile fields.
    - **Activity log:** per user and time — entry created / submitted / updated, count entry, limit reached, login, failed login, new device, password changed. Kept 90 days. Never shown to the user it describes.
    - **Activity summary:** per-user totals for today and the last 7 days (entries, submissions, updates, count entries, storage used), sortable, so spikes stand out.
-   - **Attention list** (badge with a count): accounts flagged by simple rules — reached any limit, a burst of failed logins, several new devices in a day. A SYS_ADMIN marks an item as handled.
+   - **Attention list** (badge with a count): accounts flagged by simple rules — reached a daily cap, reached a warning level (§5.5), a burst of failed logins, several new devices in a day. A SYS_ADMIN marks an item as handled.
    - **Response actions:** sign the user out of all devices; lock the account (marks it `RESET_PENDING`, so it needs a new password from a SYS_ADMIN, §4.3); delete count entries by date range.
    - **Alerts:** the Attention list in the app is always on and is the full record. When email is configured, each new flag is also emailed to every SYS_ADMIN's account email (at most one email per flagged user per hour, plus a daily summary), so the alert reaches their phone. Emails contain usernames and event types only. The screen shows whether email alerts are on.
 

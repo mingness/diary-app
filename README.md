@@ -6,6 +6,7 @@ daily-count (報數) activity. Diaries are encrypted at rest; account administra
 - What it does: [docs/project_prompt.md](docs/project_prompt.md)
 - How it's built: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), screens in [docs/FRONTEND.md](docs/FRONTEND.md)
 - Working on it: [AGENTS.md](AGENTS.md); running, resetting and phone testing: [docs/DEVELOPING.md](docs/DEVELOPING.md)
+- A test deployment on one AWS EC2 server: [docs/DEPLOY-EC2.md](docs/DEPLOY-EC2.md)
 
 **Status:** Phase A done (slices 1–10): skeleton; core domain; users and sign-in; SYS_ADMIN user management,
 activity log, Attention list and optional email alerts; the diary (encrypted entries, drafts, 提交/更新 with

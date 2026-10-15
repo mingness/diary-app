@@ -14,6 +14,7 @@ secrets/
 
 # Local data
 .data/
+deploy/backups/
 
 # Per-developer git hook setup (see lefthook.yml)
 lefthook-local.yml

@@ -214,6 +214,21 @@ describe('loadConfig', () => {
     });
   });
 
+  describe('TRUST_PROXY_HOPS', () => {
+    it('trusts no proxy unless told how many there are', () => {
+      expect(loadConfig(validEnv()).trustProxyHops).toBe(0);
+      expect(loadConfig(validEnv({ TRUST_PROXY_HOPS: '2' })).trustProxyHops).toBe(2);
+    });
+
+    it('rejects anything but a small whole number', () => {
+      for (const value of ['true', '-1', '1.5', '9']) {
+        expect(configErrorFor(validEnv({ TRUST_PROXY_HOPS: value })).invalidVariables).toEqual([
+          'TRUST_PROXY_HOPS',
+        ]);
+      }
+    });
+  });
+
   it('allows an all-zero key outside production (throwaway dev keys)', () => {
     expect(() => loadConfig(validEnv({ DIARY_KEYRING: `v1:${hex('0')}` }))).not.toThrow();
   });

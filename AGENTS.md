@@ -2,7 +2,8 @@
 
 Working notes for anyone (human or AI) changing this repo. Read `docs/project_prompt.md` (what to build),
 `docs/project_prompt_engineering.md` (how), `docs/ARCHITECTURE.md` and `docs/FRONTEND.md` (the design) first.
-Day-to-day workflows (sample data, testing the authenticator, recovery, phones) are in `docs/DEVELOPING.md`.
+Day-to-day workflows (sample data, testing the authenticator, recovery, phones) are in `docs/DEVELOPING.md`;
+a single-server test deploy (`deploy/`) is in `docs/DEPLOY-EC2.md`.
 Keep this file up to date when commands, conventions or pitfalls change.
 
 ## Commands

@@ -1,0 +1,83 @@
+# A single-server deploy (docs/DEPLOY-EC2.md): HTTPS from Caddy, then the same web and server images as
+# development, in production mode. Only Caddy is reachable from outside; nothing else publishes a port.
+#
+#   sh deploy/make-env.sh <domain>                      once: writes deploy/.env with fresh keys
+#   docker compose -f deploy/compose.yaml up -d --build --wait
+#
+# Settings come from deploy/.env (Compose reads it from this file's folder).
+name: cultivation-diary-deploy
+
+services:
+  db:
+    image: postgres:16.14-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: diary
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run sh deploy/make-env.sh first}
+      POSTGRES_DB: diary
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U diary -d diary']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  server:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://diary:${POSTGRES_PASSWORD}@db:5432/diary
+      HOST: 0.0.0.0
+      PORT: '3000'
+      # Caddy, then nginx (web), each add an X-Forwarded-For entry.
+      TRUST_PROXY_HOPS: '2'
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3000/readyz >/dev/null || exit 1']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  web:
+    build:
+      context: ..
+      dockerfile: web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      server:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:8080/ >/dev/null || exit 1']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  caddy:
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?run sh deploy/make-env.sh first}
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates: kept, so a restart doesn't ask Let's Encrypt again (it limits how often).
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+
+volumes:
+  db-data:
+  caddy-data:
+  caddy-config:

@@ -640,6 +640,12 @@ states. Each slice is one screen group, with Playwright e2e tests at 360 px and 
       appears to come from the proxy's address and shares one per-IP limit.
     - Add coarse per-IP limits at the proxy as a first line of defence. (A staging deploy can come earlier, as soon as slice 3 is done, to exercise the pipeline.)
 
+    *(Started 2026-10-15 with a single-server test deploy for other regions (EC2), in `deploy/` and
+    docs/DEPLOY-EC2.md: Caddy for HTTPS in front of the existing web and server images, `/internal/` blocked
+    at Caddy, keys from `deploy/make-env.sh`, `pg_dump` backups with a tested restore. The first rate-limit
+    task is done: `TRUST_PROXY_HOPS` (2 in `deploy/`). Still to do: Hong Kong, off-site backups, key
+    rotation, RUNBOOK/SECURITY/PRIVACY, the release pipeline, and limits at the proxy.)*
+
 Each slice ships with tests, both languages where it has UI, permission tests per role, and doc updates (§12.10).
 
 ## 12. Decisions

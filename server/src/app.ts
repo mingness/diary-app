@@ -73,6 +73,9 @@ export async function buildApp({
     // Always generate our own ID; a client-supplied one could be used to forge log correlation.
     requestIdHeader: false,
     genReqId: () => randomUUID(),
+    // Believe X-Forwarded-For only for the proxies we run (deploy/: hop 0 is the socket's peer). Any further
+    // entry is the visitor's own claim, which could otherwise be used to dodge per-IP limits.
+    trustProxy: (_address: string, hop: number) => hop < config.trustProxyHops,
   });
 
   app.setValidatorCompiler(validatorCompiler);

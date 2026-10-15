@@ -3,8 +3,9 @@
 **/coverage
 **/*.tsbuildinfo
 .git
-.env
-.env.*
+**/.env
+**/.env.*
+deploy/backups
 docs
 web/test-results
 web/playwright-report

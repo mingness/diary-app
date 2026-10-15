@@ -1,0 +1,17 @@
+# HTTPS for the whole app. Caddy gets and renews the certificate itself (Let's Encrypt), which needs DOMAIN to
+# point at this server and ports 80 and 443 open.
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Machine-only endpoints (the 報數 job trigger) are never served to the internet.
+	@internal path /internal/*
+	respond @internal 404
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	# nginx (web) serves the app and forwards /api to the server; it sets the other security headers.
+	reverse_proxy web:8080
+}

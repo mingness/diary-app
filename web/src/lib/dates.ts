@@ -129,3 +129,19 @@ export function weekdayNames(lang: Lang): string[] {
     }).format(new Date(Date.UTC(2023, 0, 1 + i))),
   );
 }
+
+/** "10月15日 02:00" in Beijing time, for times the screen says are Beijing's (the 02:00 job). */
+export function formatBeijingDateTime(iso: string, lang: Lang): string {
+  const d = new Date(iso);
+  const time = new Intl.DateTimeFormat(LOCALE[lang], { timeZone: BEIJING, ...CLOCK }).format(d);
+  if (lang === 'en') {
+    const day = new Intl.DateTimeFormat(LOCALE.en, {
+      timeZone: BEIJING,
+      month: 'short',
+      day: 'numeric',
+    }).format(d);
+    return `${day}, ${time}`;
+  }
+  const { month, day } = parts(d, BEIJING, lang);
+  return `${month}月${day}日 ${time}`;
+}

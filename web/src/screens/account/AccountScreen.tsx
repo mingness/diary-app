@@ -1,6 +1,6 @@
 /**
- * The account page (FRONTEND.md §4.6). This slice has appearance and sign-out; the profile, password,
- * devices, storage and authenticator sections arrive with slice 16.
+ * The account page (FRONTEND.md §4.6, spec §4.4): profile, appearance, storage used, password, the
+ * authenticator (SYS_ADMINs), signed-in devices, and signing out. (Installing the app: slice 17.)
  */
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -11,7 +11,11 @@ import { Button } from '../../components/Button.js';
 import { SegmentedControl } from '../../components/Field.js';
 import { Icon } from '../../components/Icon.js';
 import { useToast } from '../../components/Toast.js';
-import { useT } from '../../i18n/index.js';
+import { useI18n, useT } from '../../i18n/index.js';
+import { formatBytes } from '../../lib/images.js';
+import { DevicesSection } from './DevicesSection.js';
+import { PasswordButton } from './PasswordSheet.js';
+import { ProfileSection } from './ProfileSection.js';
 import { FONT_SIZES, type Appearance, type FontSize, type Theme } from '../../lib/appearance.js';
 import { useLogout } from './useLogout.js';
 import styles from './AccountScreen.module.css';
@@ -22,23 +26,41 @@ export function displayName(me: { username: string; profile: MeResponse['user'][
 }
 
 export function AccountScreen() {
-  const t = useT();
+  const { t } = useI18n();
   const me = useMe();
   const logout = useLogout();
 
   return (
     <div className={styles.page}>
       <h1>{t('account.title')}</h1>
-      <section className={styles.section} aria-label={t('account.title')}>
-        <div className={styles.who}>
+      <div className={styles.who}>
+        {me.profile.photo ? (
+          <img className={styles.avatar} src={me.profile.photo} alt="" />
+        ) : (
           <Icon name="user" size="2em" />
-          <div>
-            <p>{displayName(me)}</p>
-            <p className={styles.username}>{me.username}</p>
-          </div>
+        )}
+        <div>
+          <p className={styles.name}>{displayName(me)}</p>
+          <p className={styles.username}>{me.username}</p>
         </div>
-      </section>
+      </div>
+      <ProfileSection />
       <AppearanceSection />
+      <section className={styles.section} aria-labelledby="security-heading">
+        <h2 id="security-heading">{t('userForm.security')}</h2>
+        <p>{t('account.storage', { size: formatBytes(me.storageBytes) })}</p>
+        <div>
+          <PasswordButton />
+        </div>
+        {me.role === 'SYS_ADMIN' && (
+          <div>
+            <h3>{t('account.authenticator')}</h3>
+            <p>{t('account.totpOn')}</p>
+            <p className={styles.username}>{t('account.totpReset')}</p>
+          </div>
+        )}
+      </section>
+      <DevicesSection />
       <div>
         <Button variant="danger" onClick={logout.run} disabled={logout.isPending}>
           <Icon name="logout" />

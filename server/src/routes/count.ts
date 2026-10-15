@@ -35,11 +35,12 @@ export function countRoutes(app: FastifyInstance, ctx: AppContext): void {
       schema: {
         tags: TAG,
         summary:
-          'The progress card: all-time total, goal, percent, today, and the dates I may report for',
+          'The progress card: all-time total, goal, percent, today, the dates I may report for, and my own ' +
+          'number and manual reports for each of them',
         response: { 200: CountSummary },
       },
     },
-    async () => countSummary(ctx),
+    async (request) => countSummary(ctx, authOf(request).user.id),
   );
 
   routes.get(

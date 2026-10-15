@@ -103,6 +103,17 @@ export const CountSummary = z.object({
   today: z.object({ date: z.iso.date(), sum: z.number().int(), entries: z.number().int() }),
   /** The dates the caller may report for, newest first (today first). */
   countDates: z.array(z.iso.date()),
+  /**
+   * The caller's own number for each of those dates (null: none yet) and how many manual reports they made for
+   * it, so the form can say a new report replaces the number, and stop at the per-date limit.
+   */
+  mine: z.array(
+    z.object({
+      countDate: z.iso.date(),
+      count: z.number().int().nullable(),
+      manualReports: z.number().int(),
+    }),
+  ),
 });
 
 /** The latest-20 table (spec §7.1): one row per user, most recent submission first. */

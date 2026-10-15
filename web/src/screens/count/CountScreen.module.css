@@ -1,0 +1,224 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+
+.subtitle {
+  color: var(--muted);
+}
+
+.logo {
+  width: min(100%, 25rem);
+  height: auto;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+/* The total is the largest figure on the page (spec §7.1). */
+.totalLabel {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.total {
+  font-size: calc(var(--text-display) * 1.4);
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--blue);
+}
+
+.bar {
+  height: 1rem;
+  border-radius: 999px;
+  background: var(--blue-soft);
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  background: var(--blue);
+  border-radius: 999px;
+}
+
+.goalRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-title);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.today {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+}
+
+/* "報數: [box]" on one line. */
+.numberRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.numberLabel {
+  flex: none;
+  font-weight: 700;
+  font-size: var(--text-lg);
+}
+
+.numberLabel::after {
+  content: '：';
+}
+
+:global(:root:lang(en)) .numberLabel::after {
+  content: ':';
+}
+
+.numberInput {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--touch-primary);
+  padding: var(--space-1) var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+  font-size: var(--text-display);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Empty notes take no room, so 提交 sits right below the number. Cancelling the form's gap (rather than
+ * display: none) keeps them in the accessibility tree, so their messages are still announced when they appear.
+ */
+.notices:empty,
+.note:empty {
+  margin-top: calc(-1 * var(--space-4));
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.legend {
+  width: 100%;
+  padding: 0;
+  margin-bottom: var(--space-1);
+  font-weight: 600;
+}
+
+.chip {
+  position: relative;
+}
+
+.chip input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+}
+
+.chip span {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-compact);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.chip input:checked + span {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+  font-weight: 700;
+}
+
+.chip input:focus-visible + span {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.note {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.notices {
+  color: var(--amber);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+/* Adjacent rows alternate light and sky blue (spec §7.1). */
+.listRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+}
+
+.listRow:nth-child(even) {
+  background: var(--blue-soft);
+}
+
+.listHead {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.count {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Auto-submit users are shown in blue (spec §7.1), with a word too, never colour alone. */
+.autoName {
+  color: var(--blue);
+  font-weight: 700;
+}
+
+.manage {
+  align-self: flex-end;
+}

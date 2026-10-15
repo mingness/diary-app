@@ -14,8 +14,8 @@ reading submitted entries with a read audit, comments, sharing requests and appr
 02:00 Beijing, SYS_ADMIN tools); translation through an optional OpenAI-compatible provider. Phase B (the web
 app) has begun: the app shell (themes, text sizes, both languages); sign-in, registration, forgot password
 and authenticator setup; my diary, the entry view, the editor (photos, limits, 提交/更新, history) and open
-diaries; the leaders' review (calendar, students, reading pane with their comment, share approvals)
-(slices 11–14). Next: the SYS_ADMIN screens. Features arrive slice
+diaries; the leaders' review; the SYS_ADMIN screens; 報數 and the account page (slices 11–16). Next: the
+installable app (manifest, offline shell, update toast). Features arrive slice
 by slice (see the delivery plan in ARCHITECTURE.md §11).
 
 ## Quick start

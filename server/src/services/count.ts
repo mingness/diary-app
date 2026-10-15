@@ -105,9 +105,13 @@ export async function submitCount(
   });
 }
 
-/** The progress card: the all-time total, and what has been reported for today (one number per user). */
-export async function countSummary(ctx: AppContext) {
+/**
+ * The progress card: the all-time total, and what has been reported for today (one number per user); plus the
+ * caller's own number and manual reports for each date they may report for.
+ */
+export async function countSummary(ctx: AppContext, userId: string) {
   const date = today(ctx);
+  const dates = allowedDates(ctx);
   const { rows } = await ctx.db.execute<{
     total: string;
     today_sum: number;
@@ -125,8 +129,29 @@ export async function countSummary(ctx: AppContext) {
     goal: COUNT_GOAL,
     percent: Math.round((total / COUNT_GOAL) * 10_000) / 100,
     today: { date, sum: row?.today_sum ?? 0, entries: row?.today_users ?? 0 },
-    countDates: allowedDates(ctx),
+    countDates: dates,
+    mine: await myCountDates(ctx, userId, dates),
   };
+}
+
+async function myCountDates(ctx: AppContext, userId: string, dates: readonly string[]) {
+  const oldest = dates[dates.length - 1] ?? dates[0];
+  const { rows } = await ctx.db.execute<{ count_date: string; latest: number; manual: number }>(sql`
+    SELECT count_date::text AS count_date,
+           (array_agg(daily_count ORDER BY seq DESC))[1] AS latest,
+           (count(*) FILTER (WHERE NOT auto))::int AS manual
+      FROM count_entries
+     WHERE user_id = ${userId} AND count_date >= ${oldest}::date
+     GROUP BY count_date`);
+  const byDate = new Map(rows.map((r) => [r.count_date, r]));
+  return dates.map((countDate) => {
+    const found = byDate.get(countDate);
+    return {
+      countDate,
+      count: found ? Number(found.latest) : null,
+      manualReports: found?.manual ?? 0,
+    };
+  });
 }
 
 /** The latest-20 table: one row per user, most recent report first. */

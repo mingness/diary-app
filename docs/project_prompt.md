@@ -15,7 +15,7 @@ This is a private diary platform with a supervision workflow:
 1. **Users write diaries** privately. Content is encrypted at rest, and the administrators who manage accounts (SYS_ADMIN) can never read it.
 2. **Course leaders (COURSE_LEADER)** — one or more — can read every *submitted* diary and attach **comments (批注)** to them. A user's unsubmitted drafts are never visible to leaders. A comment is invisible to the user until its leader submits it.
 3. **Users may volunteer to share** a diary. Sharing needs a course leader's approval. Once approved ("Open"), any logged-in user can read that diary's content and submitted comments.
-4. Separately, everyone participates in a collective **报数 (daily count)** activity: each user reports a daily number, contributing to a global progress goal of 10,000,000, with an optional automatic daily submission.
+4. Separately, everyone participates in a collective **报数 (daily count)** of their **Great Compassion Mantra (大悲咒)** recitations: each user reports how many times they recited it that day, contributing to a shared goal of 10,000,000 recitations, with an optional automatic daily submission. The page is titled 大悲咒共修報數, and its tab reads 大悲咒 / Mantra (2026-10-15).
 5. A **web app** serves all of this and can be **installed on a phone's home screen** (web app manifest). An Android wrapper app is a fallback, built only if installing the web app proves impractical for the users (§9).
 
 **Golden rules:**

@@ -615,7 +615,10 @@ states. Each slice is one screen group, with Playwright e2e tests at 360 px and 
     Tabs: 注意 · 用戶 · 日記管理 · 我的. The e2e setup signs in one SYS_ADMIN (`admin2`, with its
     authenticator code) shared by every project; `admin` stays for the sign-in form test, since a code can't
     be used twice.)*
-16. **報數 and account.**
+16. **報數 and account.** *(Done. `GET /api/count/summary` gained `mine` (my number and manual reports for
+    each allowed date). 報數 is a tab for every role, SYS_ADMINs included; 報數管理 is a link from it. The
+    account page has profile (photo resized in the browser), appearance, storage, password (a sheet), the
+    SYS_ADMIN authenticator status (self-reset still deferred, Q1), devices, and sign-out.)*
 17. **Installable web app:** manifest, service worker, update toast, install help. Then the phone check for D10.
 
 ### Phase C: production

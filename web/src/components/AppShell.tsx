@@ -28,14 +28,16 @@ interface NavItem {
 // Destinations appear here as their screens are built (docs/ARCHITECTURE.md §11, Phase B).
 const DIARY: NavItem = { to: '/diary', label: 'nav.diary', icon: 'book' };
 const OPEN: NavItem = { to: '/open', label: 'nav.open', icon: 'bookOpen' };
+const COUNT: NavItem = { to: '/count', label: 'nav.count', icon: 'count' };
 const ME: NavItem = { to: '/me', label: 'nav.me', icon: 'user' };
 
 const NAV: Record<Role, readonly NavItem[]> = {
-  NORMAL_USER: [DIARY, OPEN, ME],
+  NORMAL_USER: [DIARY, OPEN, COUNT, ME],
   COURSE_LEADER: [
     { to: '/review', label: 'nav.review', icon: 'review', badge: 'requests' },
     { ...DIARY, wideLabel: 'nav.myDiary' },
     OPEN,
+    COUNT,
     ME,
   ],
   SYS_ADMIN: [
@@ -47,6 +49,7 @@ const NAV: Record<Role, readonly NavItem[]> = {
       wideLabel: 'nav.documentsWide',
       icon: 'book',
     },
+    COUNT,
     ME,
   ],
 };

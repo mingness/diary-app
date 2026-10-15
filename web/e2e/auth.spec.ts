@@ -19,14 +19,14 @@ test('signing in lands in the app, survives a reload, and signing out returns to
   await expect(page).toHaveURL(/\/login$/);
   await signIn(page, t, user);
 
-  // 報數 is the default destination; until its screen exists (slice 16) users land on their diary.
-  await expect(page.getByRole('heading', { name: t('diary.title') })).toBeVisible();
+  // 報數 is the default destination (spec §4.1).
+  await expect(page.getByRole('heading', { name: t('count.title') })).toBeVisible();
   await expect(page.getByRole('navigation', { name: t('nav.label') })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('heading', { name: t('diary.title') })).toBeVisible();
+  await expect(page.getByRole('heading', { name: t('count.title') })).toBeVisible();
 
   await page.getByRole('link', { name: t('nav.me'), exact: true }).click();
-  await page.getByRole('button', { name: t('account.logout') }).click();
+  await page.getByRole('button', { name: t('account.logout'), exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
   // The old session is gone on the server too, not just forgotten by the page.
   await page.goto('/me');
@@ -70,7 +70,8 @@ test.describe('administrators', () => {
 
     await page.getByLabel(t('totp.code')).fill(codeFor(seedInfo().totpKeys.admin!));
     await page.getByRole('button', { name: t('totp.submit') }).click();
-    await expect(page.getByRole('heading', { name: t('attention.title') })).toBeVisible();
+    // In, on 報數: the default destination after signing in (spec §4.1).
+    await expect(page.getByRole('heading', { name: t('count.title') })).toBeVisible();
   });
 
   test('a new SYS_ADMIN must set up an authenticator before anything else', async ({

@@ -3,6 +3,7 @@ import {
   beijingDate,
   beijingMonth,
   formatDateTime,
+  formatBeijingDateTime,
   formatDiaryDate,
   formatMonth,
   formatTime,
@@ -48,5 +49,12 @@ describe('formatting (FRONTEND.md §7)', () => {
     expect(formatTime(iso, 'zh-Hant')).toBe('07:05');
     expect(formatDateTime(iso, 'zh-Hant')).toBe('10月14日 07:05');
     expect(formatDateTime(iso, 'en')).toBe('14 Oct, 07:05');
+  });
+});
+
+describe('formatBeijingDateTime', () => {
+  it('shows Beijing time whatever the device’s zone (02:00 Beijing is 18:00 UTC the day before)', () => {
+    expect(formatBeijingDateTime('2026-10-14T18:00:00.000Z', 'zh-Hant')).toBe('10月15日 02:00');
+    expect(formatBeijingDateTime('2026-10-14T18:00:00.000Z', 'en')).toBe('15 Oct, 02:00');
   });
 });

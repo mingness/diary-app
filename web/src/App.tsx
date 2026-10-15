@@ -86,13 +86,6 @@ function ForRoles({ roles }: { roles: readonly Role[] }) {
   return roles.includes(me.role) ? <Outlet /> : <NotFound />;
 }
 
-/** Until 報數 (slice 16) exists, its landing goes to each role's home. */
-function NotYetBuilt() {
-  const me = useMe();
-  const home = { NORMAL_USER: '/diary', COURSE_LEADER: '/review', SYS_ADMIN: '/admin' } as const;
-  return <Navigate to={home[me.role]} replace />;
-}
-
 const WRITERS: readonly Role[] = ['NORMAL_USER', 'COURSE_LEADER'];
 const LEADERS: readonly Role[] = ['COURSE_LEADER'];
 const ADMINS: readonly Role[] = ['SYS_ADMIN'];
@@ -168,6 +161,14 @@ const adminRoutes: RouteObject[] = [
     }),
   },
   {
+    path: '/admin/count',
+    // Reached from 報數: a back button on phones, and room for the tables.
+    handle: { detail: true, wide: true },
+    lazy: async () => ({
+      Component: (await import('./screens/admin/CountAdminScreen.js')).CountAdminScreen,
+    }),
+  },
+  {
     path: '/admin/documents',
     ...wide,
     lazy: async () => ({
@@ -237,7 +238,12 @@ const router = createBrowserRouter([
           { element: <ForRoles roles={LEADERS} />, children: reviewRoutes },
           { element: <ForRoles roles={ADMINS} />, children: adminRoutes },
           // Landing destinations whose screens arrive in later slices (ARCHITECTURE §11).
-          { path: '/count', element: <NotYetBuilt /> },
+          {
+            path: '/count',
+            lazy: async () => ({
+              Component: (await import('./screens/count/CountScreen.js')).CountScreen,
+            }),
+          },
           { path: '*', element: <NotFound /> },
         ],
       },

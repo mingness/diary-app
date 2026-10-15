@@ -170,6 +170,23 @@ describe('the progress card and latest table (spec §7.1)', () => {
     ]);
   });
 
+  it('tells me my own number and manual reports for each date I may report for', async () => {
+    const u = await counter();
+    await report(u, 100);
+    await report(u, 30);
+    await report(u, 50, '2026-10-13');
+    const { mine } = await summary(u);
+    // Only my reports: other users' don't show, and dates without one say so.
+    expect(mine).toEqual([
+      { countDate: TODAY, count: 30, manualReports: 2 },
+      { countDate: '2026-10-13', count: 50, manualReports: 1 },
+      { countDate: '2026-10-12', count: null, manualReports: 0 },
+      { countDate: '2026-10-11', count: null, manualReports: 0 },
+      { countDate: '2026-10-10', count: null, manualReports: 0 },
+      { countDate: '2026-10-09', count: null, manualReports: 0 },
+    ]);
+  });
+
   it('one row per user, most recent first, with name, today, total, first date and auto marker', async () => {
     const [a, b] = [await counter(), await counter()];
     await report(a, 10, '2026-10-10');

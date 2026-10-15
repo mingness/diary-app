@@ -70,7 +70,7 @@ just hue.
 |---|---|---|
 | NORMAL_USER | 日記 · 開放日記 · 報數 · 我的 | same four, as top links |
 | COURSE_LEADER | 批閱 (badge: share requests) · 日記 · 開放日記 · 報數 · 我的 | 批閱 (badge) · 我的日記 · 開放日記 · 報數 · 我的 |
-| SYS_ADMIN | 注意 (badge) · 用戶 (badge) · 日記 · 報數 · 我的 | 注意 (badge) · 用戶 (badge) · 日記管理 · 報數管理 · 我的 |
+| SYS_ADMIN | 注意 (badge) · 用戶 (badge) · 日記 · 報數 · 我的 | 注意 (badge) · 用戶 (badge) · 日記管理 · 報數 · 我的 (報數管理 is a link on 報數; admins take part in 報數 too) |
 
 - The tab bar replaces the spec's My Diary / Open Diary toggle and its scattered header buttons (§6.2, §7.4).
   "Go Diary" from the count page is simply the 日記 tab.
@@ -177,7 +177,11 @@ Each screen lists what it needs from the API. The API column feeds the ARCHITECT
 - **Latest 20:** on phones this is a list, not a 5-column table. Each row shows name and today's count, then a
   muted line "總計 · 首次 · 最近". Rows alternate colours and auto-submit names are blue (spec §7.1). On desktop
   it's a real table with the spec's columns.
-- **API:** `GET count/summary`, `GET count/latest`, `GET/PUT count/settings`, `POST count`.
+- **Built (2026-10-15):** the logo is a placeholder (`web/src/assets/count-logo.svg`, 400 × 80) to replace with
+  the real green artwork. The form starts from the user's saved number; the typed number is saved quietly
+  (debounced) for the 02:00 job. Auto-submit users are blue with the word 自動 too.
+- **API:** `GET count/summary` (with `mine`: my number and manual reports per allowed date, for the "replaces"
+  note and the per-date limit), `GET count/latest`, `GET/PUT count/settings`, `POST count`.
 
 ### 4.6 Account (all)
 
@@ -232,8 +236,9 @@ its 已開放 chip with a small 取消開放 beside it.
   鎖定帳戶) and **刪除帳戶**; the actions on your own account that the server refuses aren't offered.
 - **日記管理:** search by username and/or date; the table shows title, date, author and state; delete with
   confirm. Metadata only.
-- **報數管理** (slice 16): all users, an auto-submit toggle per row, delete entries per row (all, or a count-date
-  range; confirm), job-run history and 立即執行.
+- **報數管理** (a link on 報數): a banner when the latest 02:00 run is missing or failed (its time in Beijing
+  time), the recent runs, 立即執行; all users with an auto-submit switch per row, totals, and deleting a user's
+  entries (all, or a count-date range; confirm).
 - **API:** as in ARCHITECTURE §7.3. User rows need `role, status, totpEnabled, storageBytes, createdAt`.
 
 ## 5. Components
@@ -264,7 +269,8 @@ snapshot at 360 px and 1280 px.
 - The spec mixes simplified and traditional characters (暂存, 报数, 两次密码输入不同, 翻译, 历史版本,
   有新文档). The zh-Hant table uses traditional throughout: 暫存, 報數, 兩次密碼輸入不同, 翻譯, 歷史版本,
   有新文件 / 有新批注. "攥写日记" in spec §6.2 is a typo for **撰寫日記** (F5, agreed).
-- English UI name: **Cultivation Diary** for 修行日記 (agreed). 報數 is "Count", 批注 is
+- English UI name: **Cultivation Diary** for 修行日記 (agreed). 報數 counts **Great Compassion Mantra** recitations:
+  its tab is 大悲咒 / "Mantra" and the page 大悲咒共修報數 / "Great Compassion Mantra recitation" (2026-10-15); 批注 is
   "comment", 導師 is "course leader" ("Leader …" before a name), and 學員 is "student".
 - Every string lives in `web/src/i18n/{zh-Hant,en}.ts` (alert emails, written by the server, use
   `server/src/i18n/`; ARCHITECTURE §8.10). Dates use `Intl.DateTimeFormat` with the active locale

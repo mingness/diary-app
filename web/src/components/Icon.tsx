@@ -24,6 +24,7 @@ const PATHS = {
   history: 'M3 12a9 9 0 1 0 3-6.7M3 4v4h4M12 7v5l3 2',
   review: 'M9 4h6v3H9V4Zm-3 1H5v16h14V5h-1M8 13l3 3 5-6',
   forward: 'M9 5l7 7-7 7',
+  count: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
   bell: 'M6 16V11a6 6 0 1 1 12 0v5l2 2H4l2-2Zm4 4h4',
   users:
     'M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm-6 9a6 6 0 0 1 12 0M16 4.5a3.5 3.5 0 0 1 0 6.5M21 20a6 6 0 0 0-3.5-5.5',

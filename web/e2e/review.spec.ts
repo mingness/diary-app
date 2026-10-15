@@ -88,8 +88,8 @@ test('today’s entries show at once; a draft comment stays hidden until it is s
   t,
 }) => {
   const entry = await submittedEntry(userPage, 'Review');
-  await page.goto('/');
-  await expect(page).toHaveURL(/\/review/);
+  // Leaders land on 報數 by default (spec §4.1); 批閱 opens on today's entries.
+  await page.goto('/review');
   const item = await inFeed(page, entry.title);
 
   // Nothing written yet: a small button, not an empty editor.

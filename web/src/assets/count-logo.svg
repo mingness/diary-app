@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="80" viewBox="0 0 400 80" aria-hidden="true">
+  <!-- Placeholder for the green banner (spec §7.4), with no words so it suits both languages: replace this
+       file with the real 400 × 80 artwork. -->
+  <rect width="400" height="80" rx="16" fill="#2f6b3a"/>
+  <g fill="none" stroke="#e3efe3" stroke-width="3">
+    <circle cx="200" cy="40" r="26"/>
+    <path d="M200 20c8 10 8 30 0 40-8-10-8-30 0-40Z" fill="#e3efe3"/>
+    <path d="M200 60c-9-3-16-10-18-20M200 60c9-3 16-10 18-20"/>
+  </g>
+</svg>

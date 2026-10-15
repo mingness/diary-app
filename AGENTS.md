@@ -6,26 +6,28 @@ Keep this file up to date when commands, conventions or pitfalls change.
 
 ## Commands
 
-| Task                                                   | Command                                                                                                 |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| Install                                                | `npm ci` (Node version in `.nvmrc`; `fnm use` / `nvm use`)                                              |
-| First-time setup                                       | `npm run dev:setup` (writes `.env` with throwaway keys; never commit it)                                |
-| Start the database                                     | `npm run db:up`                                                                                         |
-| Run the API with reload                                | `npm run dev` (http://localhost:3000, needs the database)                                               |
-| API explorer (try every endpoint in the browser)       | http://localhost:3000/docs (OpenAPI JSON at `/docs/json`)                                               |
-| Run the whole stack in Docker                          | `docker compose up -d --wait --build`                                                                   |
-| Everything CI checks                                   | `npm run check`                                                                                         |
-| Format / lint / types                                  | `npm run format`, `npm run lint`, `npm run typecheck`                                                   |
-| Unit tests (no database)                               | `npm run test:unit`                                                                                     |
-| Integration tests                                      | `npm run test:integration` (needs `npm run db:up`; each file gets a fresh database)                     |
-| All tests / unit tests on save                         | `npm test`, `npm run test:watch`                                                                        |
-| Coverage report (all tests; HTML in `coverage/`)       | `npm run test:coverage`                                                                                 |
-| Functional tests (live stack, real config; local only) | `npm run test:functional` after `docker compose restart server`; see `server/test/functional/README.md` |
-| Sample users and entries (dev; wipes)                  | `npm run seed -- --reset` (every password is `password123`; admins' authenticator keys are printed)     |
-| Current code for a seeded admin's authenticator key    | `npm run cli -w server -- totp-code <key>`                                                              |
-| First admin / recovery (production, in the container)  | `node server/dist/cli.js create-sysadmin <name>` · `set-password <name>` · `reset-totp <name>`          |
-| New migration after editing `server/src/db/schema.ts`  | `npm run db:generate -w server`, then review the SQL                                                    |
-| Stop the database                                      | `npm run db:down` (add `-v` to `docker compose down` to wipe data)                                      |
+| Task                                                   | Command                                                                                                                |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| Install                                                | `npm ci` (Node version in `.nvmrc`; `fnm use` / `nvm use`)                                                             |
+| First-time setup                                       | `npm run dev:setup` (writes `.env` with throwaway keys; never commit it)                                               |
+| Start the database                                     | `npm run db:up`                                                                                                        |
+| Run the API with reload                                | `npm run dev` (http://localhost:3000, needs the database)                                                              |
+| Run the web app with reload                            | `npm run dev:web` (http://localhost:5173, forwards `/api` to `npm run dev`)                                            |
+| API explorer (try every endpoint in the browser)       | http://localhost:3000/docs (OpenAPI JSON at `/docs/json`)                                                              |
+| Run the whole stack in Docker                          | `docker compose up -d --wait --build` (app on http://localhost:8080, API on :3000)                                     |
+| Everything CI checks                                   | `npm run check`                                                                                                        |
+| Format / lint / types                                  | `npm run format`, `npm run lint`, `npm run typecheck`                                                                  |
+| Unit tests (no database)                               | `npm run test:unit`                                                                                                    |
+| Integration tests                                      | `npm run test:integration` (needs `npm run db:up`; each file gets a fresh database)                                    |
+| All tests / unit tests on save                         | `npm test`, `npm run test:watch`                                                                                       |
+| Coverage report (all tests; HTML in `coverage/`)       | `npm run test:coverage`                                                                                                |
+| Functional tests (live stack, real config; local only) | `npm run test:functional` after `docker compose restart server`; see `server/test/functional/README.md`                |
+| End-to-end tests (browser; local only)                 | `npm run test:e2e` (starts and reseeds its own stack on :8081; `npm run e2e:down` removes it); see `web/e2e/README.md` |
+| Sample users and entries (dev; wipes)                  | `npm run seed -- --reset` (every password is `password123`; admins' authenticator keys are printed)                    |
+| Current code for a seeded admin's authenticator key    | `npm run cli -w server -- totp-code <key>`                                                                             |
+| First admin / recovery (production, in the container)  | `node server/dist/cli.js create-sysadmin <name>` · `set-password <name>` · `reset-totp <name>`                         |
+| New migration after editing `server/src/db/schema.ts`  | `npm run db:generate -w server`, then review the SQL                                                                   |
+| Stop the database                                      | `npm run db:down` (add `-v` to `docker compose down` to wipe data)                                                     |
 
 ## Layout
 
@@ -33,6 +35,10 @@ Keep this file up to date when commands, conventions or pitfalls change.
 - `server/src/`: `main.ts` (process entry), `app.ts` (builds Fastify; tests use it), `config.ts`, `db/`,
   `routes/`. Pure logic lives in `server/src/domain/` (crypto, authz, diary, count) with no HTTP or DB code;
   rules shared with the web app (e.g. 報數 input) live in `shared/src/`.
+- `web/`: the React app (Vite). `src/api/` (the one fetch wrapper and the session), `src/i18n/` (every UI
+  string, both languages), `src/components/` (shared UI), `src/screens/` (one folder per screen group),
+  `src/lib/` (pure helpers), `src/styles/` (tokens). Unit tests in `web/test/`, Playwright in `web/e2e/`.
+  `web/Dockerfile` builds it into nginx, which serves it and forwards `/api` to the server.
 - `server/test/unit/` and `server/test/integration/`; helpers in `server/test/helpers/`. The test scripts also
   work from inside `server/` (`npm test`, `npm run test:unit`, …); they share the root `vitest.config.ts`.
 - `db/migrations/`: generated SQL plus `meta/_journal.json`. Append-only once shipped.
@@ -43,7 +49,12 @@ Keep this file up to date when commands, conventions or pitfalls change.
   `npm run check` green and `docker compose up` working. Nothing half-built is reachable.
 - **Test layers:** unit (pure logic, no I/O), integration (the app on a fresh database, with a controllable
   clock), functional (the running stack over real HTTP with its real configuration; for behaviour like per-IP
-  rate limits that only means something end to end; local only).
+  rate limits that only means something end to end), and e2e (the web app in a browser against the running
+  stack).
+- **What CI runs:** format, lint, typecheck, unit and integration tests, an image build with a start-up check,
+  the secret scan and the dependency audit. Unit and integration tests are what keep `main` safe, so a
+  behaviour worth protecting gets one of those. Functional and e2e tests are for the developer: run them
+  locally before merging a change they cover (e2e for any UI change); they are never in CI.
 - **Tests ship with the code.** A bug fix starts with a failing test. Integration tests cover every role,
   allowed and denied.
 - **What to test.** Unit tests pin exact input → output where the spec defines it (permission tables, 報數
@@ -89,13 +100,22 @@ Keep this file up to date when commands, conventions or pitfalls change.
   several rounds; over HTTP the first request usually finishes first and hides the race.
 - **Config:** only through `loadConfig` in `server/src/config.ts`. Add every new variable to `.env.example`
   with a comment, and to `scripts/dev-setup.mjs` if it is a secret.
+- **Web app:** no UI text outside `web/src/i18n/` (the zh-Hant table defines the keys; a missing English
+  string or untranslated `ErrorCode` fails the type check). Every API call goes through `api()` in
+  `web/src/api/client.ts` inside TanStack Query; screens show `ApiError` codes with `tError` and the request
+  ID. Styles are CSS modules using the tokens in `web/src/styles/tokens.css`, sized in rem. A new screen gets
+  an axe check in both themes in `web/e2e/` and works at 360 px and 22 px text.
+- **E2E tests** read strings from the app's own tables via the `t` fixture, so one test covers both
+  languages. The stack's per-IP limits are real: sign in through the saved sessions (`userPage`) rather than
+  the form where the form isn't the point, and run register/forgot-password/admin flows in one project.
 - **Comments** explain why, not what. Public functions get a doc comment.
 - **Commits:** Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`).
 
 ## Known pitfalls
 
 - **VS Code as a Flatpak** (this machine): the editor's terminal is sandboxed and can't see the `docker`
-  command. Use `flatpak-spawn --host docker compose …` from that terminal, or a normal system terminal. Ports
+  command. Use `flatpak-spawn --host docker compose …` from that terminal, or a normal system terminal. The
+  e2e tests start their stack themselves: run them with `DOCKER="flatpak-spawn --host docker"`. Ports
   published by containers (5432 → 55432, 3000) are reachable from inside the sandbox.
 - **Git hooks can't find Node** (`npx`/`node: command not found` on commit): your git client's PATH lacks
   Node (common with VS Code as a Flatpak, or nvm/fnm set up only in interactive shells). Create a git-ignored
@@ -107,5 +127,8 @@ Keep this file up to date when commands, conventions or pitfalls change.
   "never migrated" from "up to date". Don't delete it.
 - **Dev-only audit warnings:** `npm audit` reports moderate issues in an old esbuild inside `drizzle-kit`
   (dev tool only, never shipped or served). CI fails only on production-dependency findings.
+- **Stale web image:** if the app at :8080 doesn't show a change, `docker compose up --build` may have kept
+  the old image (seen through `flatpak-spawn`). Run `docker compose build web && docker compose up -d web`
+  and compare the `/assets/index-*.js` name in the page source.
 - **`.env` and gitleaks:** a local secret scan of the working tree flags `.env`. That's expected (it's
   git-ignored and holds throwaway keys); CI scans git history, which must stay clean.

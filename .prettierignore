@@ -4,3 +4,5 @@ coverage
 package-lock.json
 db/migrations
 docs
+web/test-results
+web/playwright-report

@@ -2,9 +2,19 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 import globals from 'globals';
+import reactHooks from 'eslint-plugin-react-hooks';
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/coverage/**', 'db/migrations/**', 'docs/**'] },
+  {
+    ignores: [
+      '**/dist/**',
+      '**/coverage/**',
+      'db/migrations/**',
+      'docs/**',
+      'web/test-results/**',
+      'web/playwright-report/**',
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.strict,
   {
@@ -18,8 +28,15 @@ export default tseslint.config(
     },
   },
   {
+    // The web app runs in the browser, not Node.
+    files: ['web/src/**'],
+    languageOptions: { globals: { ...globals.browser } },
+    plugins: { 'react-hooks': reactHooks },
+    rules: reactHooks.configs.recommended.rules,
+  },
+  {
     // In tests a missing value fails the test anyway, so `!` is a harmless shorthand there.
-    files: ['**/test/**'],
+    files: ['**/test/**', 'web/e2e/**'],
     rules: { '@typescript-eslint/no-non-null-assertion': 'off' },
   },
   {

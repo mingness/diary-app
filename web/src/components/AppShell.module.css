@@ -1,0 +1,116 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  padding-top: max(var(--space-2), env(safe-area-inset-top));
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  font-weight: 700;
+  font-size: var(--text-lg);
+  font-family: var(--font-serif);
+  margin-right: auto;
+}
+
+.main {
+  width: 100%;
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-4) calc(6rem + env(safe-area-inset-bottom));
+}
+
+.wide {
+  max-width: 80rem;
+}
+
+/* Phones and tablets: the tab bar sits at the bottom (FRONTEND.md §3). */
+.nav {
+  position: fixed;
+  z-index: 10;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.tabs {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tabs li {
+  flex: 1;
+}
+
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  min-height: 3.5rem;
+  padding: var(--space-1) var(--space-1);
+  color: var(--muted);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  text-align: center;
+  line-height: 1.2;
+}
+
+.tab[aria-current='page'] {
+  color: var(--primary);
+  font-weight: 700;
+  box-shadow: inset 0 3px 0 var(--primary);
+}
+
+/* Desktop: the same links move into the top bar. */
+@media (min-width: 1024px) {
+  .header {
+    padding-left: var(--space-5);
+    padding-right: var(--space-5);
+  }
+
+  .brand {
+    margin-right: var(--space-5);
+  }
+
+  .nav {
+    position: static;
+    margin-right: auto;
+    background: none;
+    border: 0;
+    padding: 0;
+  }
+
+  .tabs {
+    gap: var(--space-1);
+  }
+
+  .tab {
+    flex-direction: row;
+    gap: var(--space-2);
+    min-height: var(--touch);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-input);
+    font-size: 1rem;
+  }
+
+  .tab[aria-current='page'] {
+    background: var(--primary-soft);
+    box-shadow: none;
+  }
+
+  .main {
+    padding-bottom: var(--space-6);
+  }
+}

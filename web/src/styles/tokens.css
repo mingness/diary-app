@@ -1,0 +1,94 @@
+/*
+ * Design tokens (FRONTEND.md §2). Light by default; dark when the device prefers it and the user hasn't
+ * chosen light, or when the user chose dark. Every text/background pair meets WCAG AA.
+ */
+:root {
+  --bg: #f6f2ec;
+  --surface: #ffffff;
+  --surface-2: #efe8df;
+  --text: #2b2622;
+  --muted: #665c53;
+  --border: #d9cec1;
+  --primary: #7a4e24;
+  --on-primary: #ffffff;
+  --primary-soft: #f1e6d8;
+  --green: #2f6b3a;
+  --green-soft: #e3efe3;
+  --amber: #8a5300;
+  --amber-soft: #f7ebd6;
+  --blue: #2f5d8c;
+  --blue-soft: #e2ebf4;
+  --danger: #a63a2a;
+  --danger-soft: #f8e4e0;
+  --focus: #2f5d8c;
+  color-scheme: light;
+
+  --font-ui: 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', system-ui, sans-serif;
+  --font-serif: 'Songti TC', 'Noto Serif TC', 'PMingLiU', serif;
+
+  /* Type scale: multiples of the user's base size (FRONTEND.md §2.2). */
+  --text-sm: 0.85rem;
+  --text-lg: 1.15rem;
+  --text-title: 1.35rem;
+  --text-display: 1.75rem;
+
+  /* 4 px grid, expressed in rem so it grows with the text size. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
+  --radius-input: 10px;
+  --radius-card: 14px;
+  --touch: 2.75rem; /* 44 px at 16 px */
+  --touch-primary: 3.25rem; /* 52 px at 16 px */
+  --content-width: 40rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #1a1714;
+    --surface: #24201c;
+    --surface-2: #2f2a25;
+    --text: #eee7de;
+    --muted: #b5a99c;
+    --border: #40382f;
+    --primary: #d9a36b;
+    --on-primary: #1a1714;
+    --primary-soft: #3a2f24;
+    --green: #8cc79a;
+    --green-soft: #22342a;
+    --amber: #e8b465;
+    --amber-soft: #3a2e1c;
+    --blue: #8db4de;
+    --blue-soft: #1f2c3a;
+    --danger: #f09a8a;
+    --danger-soft: #3a221e;
+    --focus: #8db4de;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #1a1714;
+  --surface: #24201c;
+  --surface-2: #2f2a25;
+  --text: #eee7de;
+  --muted: #b5a99c;
+  --border: #40382f;
+  --primary: #d9a36b;
+  --on-primary: #1a1714;
+  --primary-soft: #3a2f24;
+  --green: #8cc79a;
+  --green-soft: #22342a;
+  --amber: #e8b465;
+  --amber-soft: #3a2e1c;
+  --blue: #8db4de;
+  --blue-soft: #1f2c3a;
+  --danger: #f09a8a;
+  --danger-soft: #3a221e;
+  --focus: #8db4de;
+  color-scheme: dark;
+}

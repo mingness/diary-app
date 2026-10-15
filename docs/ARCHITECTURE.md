@@ -49,7 +49,7 @@
 | Migrations | **drizzle-kit** generates SQL into `/db/migrations`; applied at startup | Versioned SQL files, never edited after shipping (§12.6) |
 | Password hash | **argon2id** (`@node-rs/argon2`) | §12.4 |
 | HTML sanitising | **sanitize-html** on the server (editor tags only) | Stored-XSS defence for shared entries |
-| Web | **React 18 + Vite**, react-router | Static build |
+| Web | **React 19 + Vite**, react-router (data router) | Static build, served by nginx in the `web` container. React 19 rather than 18: 18 no longer gets fixes, and nothing we use needs 18 (changed 2026-10-15) |
 | Server state (web) | **TanStack Query** (F4, agreed) | Polling that pauses, retries, cache invalidation after writes; see FRONTEND.md §10 |
 | Rich text (web) | **Tiptap** on ProseMirror (F4, agreed) | Replaces deprecated `execCommand`; its schema mirrors the server's sanitiser allowlist |
 | PWA | **vite-plugin-pwa** (Workbox) | Manifest, service worker and update prompt |
@@ -519,8 +519,10 @@ cover just those files.
 ## 10. CI/CD and deploy (§12.8)
 
 - **`ci.yml`** runs on every push and PR: format → lint → typecheck → unit → integration (Postgres service) →
-  build web → build server image → Playwright e2e against `docker compose`, in both languages, at a 360 px
-  viewport, including PWA install and an offline shell check → gitleaks → `npm audit`.
+  build the server and web images and smoke-test the stack → gitleaks → `npm audit`.
+- **Playwright e2e** runs locally, not in CI (decided 2026-10-15): against `docker compose`, in both
+  languages, at 360 px and 1280 px, including (from slice 17) PWA install and an offline shell check. Run it
+  before merging a change with UI. This departs from engineering standards §12.5/§12.8, which put it in CI.
 - **`release.yml`** runs on `v*` tags. It pushes an immutably tagged server image (with the web build inside or
   alongside) to a registry.
 - **Deploy is written fresh.** It runs compose on the server with a TLS-terminating reverse proxy, and the
@@ -576,8 +578,13 @@ its entries in the API explorer (D20), so it can be checked by hand before any s
 The dev stack runs the real API with seed data, so every screen is built against realistic content in all
 states. Each slice is one screen group, with Playwright e2e tests at 360 px and 1280 px in both languages.
 
-11. **App shell:** tokens, themes, text sizes, i18n, tab bar/top bar, toasts, error states.
-12. **Login, register, forgot password.**
+11. **App shell:** tokens, themes, text sizes, i18n, tab bar/top bar, toasts, error states. *(Done. The
+    `web` container (nginx) serves the build, sets the CSP and forwards `/api`; it is the reverse proxy that
+    Phase C adds TLS to. Tabs appear as their screens are built; until then every landing goes to 我的,
+    which has appearance and sign-out. Playwright visual snapshots (FRONTEND.md §5) are deferred: CJK fonts
+    differ between machines, so they need a pinned browser image first.)*
+12. **Login, register, forgot password.** *(Done, with the authenticator step and first-time authenticator
+    setup for SYS_ADMINs. Registration takes no photo yet; it arrives with the account page in slice 16.)*
 13. **My diary, entry view, editor** (Tiptap, image downscaling, photo and length limits, 提交/更新).
 14. **Leader review and open requests.**
 15. **SYS_ADMIN screens**, including Attention and activity.

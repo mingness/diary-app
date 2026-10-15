@@ -1,5 +1,6 @@
 # Runs on every push and pull request; must pass before merging to main (engineering standards §12.8).
-# Stages grow with the delivery plan (docs/ARCHITECTURE.md §11): web build and e2e arrive in Phase B.
+# Stages grow with the delivery plan (docs/ARCHITECTURE.md §11). Browser (e2e) tests run locally only:
+# see web/e2e/README.md.
 name: CI
 
 on:
@@ -69,15 +70,17 @@ jobs:
           retention-days: 14
 
   image:
-    name: Build server image and smoke-test the stack
+    name: Build the images and smoke-test the stack
     runs-on: ubuntu-24.04
     needs: [check, integration]
     steps:
       - uses: actions/checkout@v4
       - run: node scripts/dev-setup.mjs
       - run: docker compose up -d --wait --build
-      - name: Ready check
-        run: curl -fsS http://127.0.0.1:3000/readyz
+      - name: Ready check (API, and the web app through its proxy)
+        run: |
+          curl -fsS http://127.0.0.1:3000/readyz
+          curl -fsS http://127.0.0.1:8080/api/auth/captcha >/dev/null
       - name: Production refuses placeholder secrets
         run: |
           set +e

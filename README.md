@@ -11,9 +11,10 @@ daily-count (報數) activity. Diaries are encrypted at rest; account administra
 activity log, Attention list and optional email alerts; the diary (encrypted entries, drafts, 提交/更新 with
 history, limits, sanitising) and SYS_ADMIN document management; the leader API (review lists, calendar,
 reading submitted entries with a read audit, comments, sharing requests and approvals); open diaries; the account API (profile, appearance, password, devices); 報數 (count, progress, auto-submit at
-02:00 Beijing, SYS_ADMIN tools); translation through an optional OpenAI-compatible provider. Next: Phase B,
-the web app. Features arrive slice by slice (see the
-delivery plan in ARCHITECTURE.md §11).
+02:00 Beijing, SYS_ADMIN tools); translation through an optional OpenAI-compatible provider. Phase B (the web
+app) has begun: the app shell (themes, text sizes, both languages) and sign-in, registration, forgot password
+and authenticator setup (slices 11–12). Next: my diary, the entry view and the editor. Features arrive slice
+by slice (see the delivery plan in ARCHITECTURE.md §11).
 
 ## Quick start
 
@@ -26,11 +27,14 @@ npm run db:up          # PostgreSQL on 127.0.0.1:55432
 npm run dev            # API on http://localhost:3000
 npm run seed -- --reset # sample users; every password is password123
 curl localhost:3000/readyz
+npm run dev:web        # the web app on http://localhost:5173 (forwards /api to :3000)
 ```
 
-Then open http://localhost:3000/docs to browse and try every API endpoint (development and staging only).
+Then open http://localhost:5173 and sign in as `chenmd` (a normal user) or `leader.lin`; with
+`CAPTCHA_FIXED=true` (the dev default) the CAPTCHA answer is always 3. http://localhost:3000/docs lets you
+browse and try every API endpoint (development and staging only).
 
-Or run everything in containers: `docker compose up -d --wait --build`.
+Or run everything in containers: `docker compose up -d --wait --build`, then open http://localhost:8080.
 
 ## Tests
 
@@ -41,5 +45,6 @@ npm run test:integration  # needs `npm run db:up`
 npm run test:watch        # unit tests, re-run on save
 npm run test:coverage     # all tests plus a coverage report in coverage/
 npm run test:functional   # against the running stack (local only; see server/test/functional/README.md)
+npm run test:e2e          # the web app in a browser, on its own throwaway stack (see web/e2e/README.md)
 npm run check             # everything CI runs before the Docker and secret-scan stages
 ```

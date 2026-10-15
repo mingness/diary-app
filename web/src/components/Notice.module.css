@@ -1,0 +1,45 @@
+.notice {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-input);
+  border-left: 4px solid currentColor;
+}
+
+.notice > svg {
+  flex: none;
+  margin-top: 0.2em;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--text);
+}
+
+.ref {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.info {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.success {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.warning {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.error {
+  background: var(--danger-soft);
+  color: var(--danger);
+}

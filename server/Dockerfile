@@ -9,7 +9,8 @@ COPY server/package.json server/
 RUN npm ci
 COPY shared shared
 COPY server server
-RUN npm run build && npm prune --omit=dev
+# Only what this image ships; the web app has its own image (web/Dockerfile).
+RUN npm run build -w shared && npm run build -w server && npm prune --omit=dev
 
 FROM node:22.23.3-alpine3.23
 ENV NODE_ENV=production

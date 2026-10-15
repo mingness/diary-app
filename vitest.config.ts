@@ -26,7 +26,11 @@ export default defineConfig({
         resolve: { alias },
         test: {
           name: 'unit',
-          include: ['server/test/unit/**/*.test.ts', 'shared/test/**/*.test.ts'],
+          include: [
+            'server/test/unit/**/*.test.ts',
+            'shared/test/**/*.test.ts',
+            'web/test/**/*.test.ts',
+          ],
         },
       },
       {

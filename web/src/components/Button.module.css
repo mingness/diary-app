@@ -1,0 +1,58 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--touch);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-input);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  line-height: 1.3;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.primary {
+  min-height: var(--touch-primary);
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.secondary {
+  background: var(--surface);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.quiet {
+  background: transparent;
+  color: var(--primary);
+}
+
+.quiet:hover:not(:disabled) {
+  background: var(--primary-soft);
+}
+
+.danger {
+  background: var(--surface);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+/* Primary actions are full width on phones (FRONTEND.md §1.4). */
+.wide {
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .wide {
+    width: auto;
+    min-width: 12rem;
+  }
+}

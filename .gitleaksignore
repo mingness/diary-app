@@ -1,0 +1,7 @@
+# Findings gitleaks reports that are not secrets. Each line is a fingerprint (commit:file:rule:line) from
+# `gitleaks git --verbose`. Only add a line after checking the value by hand; never to silence a real key.
+
+# A made-up translation key in the config unit tests (bfb77cf), since replaced with an obviously fake value.
+bfb77cfddf39d2f7eafd21d7d512c2aa54158a30:server/test/unit/config.test.ts:generic-api-key:141
+bfb77cfddf39d2f7eafd21d7d512c2aa54158a30:server/test/unit/config.test.ts:generic-api-key:153
+bfb77cfddf39d2f7eafd21d7d512c2aa54158a30:server/test/unit/config.test.ts:generic-api-key:163

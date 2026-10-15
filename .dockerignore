@@ -6,3 +6,5 @@
 .env
 .env.*
 docs
+web/test-results
+web/playwright-report

@@ -18,3 +18,8 @@ secrets/
 # Per-developer git hook setup (see lefthook.yml)
 lefthook-local.yml
 .lefthook-node.sh
+
+# Playwright output
+web/test-results/
+web/playwright-report/
+web/e2e/.auth/

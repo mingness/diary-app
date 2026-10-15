@@ -4,7 +4,8 @@
   "type": "module",
   "workspaces": [
     "shared",
-    "server"
+    "server",
+    "web"
   ],
   "engines": {
     "node": ">=22.12 <23"
@@ -14,19 +15,22 @@
     "db:up": "docker compose up -d --wait db",
     "db:down": "docker compose down",
     "dev": "npm run dev -w server",
+    "dev:web": "npm run dev -w web",
     "seed": "npm run seed -w server --",
-    "build": "npm run build -w shared && npm run build -w server",
+    "build": "npm run build -w shared && npm run build -w server && npm run build -w web",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint --max-warnings 0 .",
-    "typecheck": "tsc -b && tsc -p server/tsconfig.test.json",
+    "typecheck": "tsc -b && tsc -p server/tsconfig.test.json && tsc -p web",
     "test": "npm run test:unit && npm run test:integration",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
     "test:watch": "vitest --project unit",
     "test:coverage": "vitest run --coverage --project unit --project integration",
     "test:functional": "vitest run --project functional",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm test"
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test",
+    "test:e2e": "playwright test -c web/playwright.config.ts",
+    "e2e:down": "docker compose --project-name cultivation-diary-e2e --env-file .env --env-file web/e2e/stack.env down --volumes"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -34,6 +38,7 @@
     "@vitest/coverage-v8": "^5.0.4",
     "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",
     "lefthook": "^2.2.2",
     "prettier": "^3.9.10",

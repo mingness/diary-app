@@ -147,6 +147,7 @@ export const SEED_ENTRIES: readonly SeedEntry[] = [
     daysAgo: 1,
     title: '共修後的反省',
     submissions: [p('共修時一直在意旁邊的人念得太大聲。回家後想想，其實是自己的心不夠靜。')],
+    access: 'open',
   },
   {
     owner: 'leader.lin',

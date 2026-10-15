@@ -138,7 +138,8 @@ Each screen lists what it needs from the API. The API column feeds the ARCHITECT
   translate buttons).
 - **Owner actions:** 編輯 (opens 4.3), and the share request toggle.
 - **Open Diary tab:** the same screen without the owner actions, reached from a list of open entries by month.
-- **API:** `GET documents/:id` → `view` (`owner` / `leader`) + content + submitted comments
+- **API:** `GET documents/open?month=` → rows `id, title, diaryDate, author, commentCount`;
+  `GET documents/:id` → `view` (`owner` / `leader` / `reader`) + content + submitted comments
   `{id, authorName, submittedAt, body}` (`authorName` null for a former leader; the owner also gets `isNew`);
   `POST translate {documentId|commentId, direction}`.
 

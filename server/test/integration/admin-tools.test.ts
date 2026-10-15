@@ -143,7 +143,7 @@ describe('seed entries (spec §11)', () => {
           (r) => (state === null || r.state === state) && (access === null || r.access === access),
         )
         .reduce((sum, r) => sum + r.n, 0);
-    expect(count(null, 'open')).toBe(1);
+    expect(count(null, 'open')).toBe(2);
     expect(count(null, 'wait_for_open')).toBe(2);
     expect(count('draft', null)).toBeGreaterThanOrEqual(1);
     expect(count('submitted_with_draft', null)).toBeGreaterThanOrEqual(1);

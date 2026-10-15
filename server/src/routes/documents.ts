@@ -1,7 +1,7 @@
 /**
  * The diary (spec §5): the owner's create, 暫存, 提交/更新, history and month list; reading an entry as its
- * owner or as a leader; leaders' comments; and sharing changes. Readers of open entries arrive with delivery
- * slice 7; until then anyone else gets 404.
+ * owner, as a leader, or as a reader of an open entry; the open-entry list; leaders' comments; and sharing
+ * changes.
  */
 import type { FastifyBaseLogger, FastifyInstance, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
@@ -16,6 +16,8 @@ import {
   DocumentVersions,
   MyDocumentList,
   MyDocumentsQuery,
+  OpenDocumentList,
+  OpenDocumentsQuery,
   OwnDocument,
   SaveDocumentRequest,
 } from '@diary/shared';
@@ -32,6 +34,7 @@ import {
   type Written,
 } from '../services/diary/documents.js';
 import { listVersions, readEntry, type Reader } from '../services/diary/entries.js';
+import { listOpenMonth } from '../services/open-diaries.js';
 import { changeAccess } from '../services/sharing.js';
 import { LimitReachedError } from '../services/diary/usage.js';
 
@@ -93,6 +96,21 @@ export function documentRoutes(app: FastifyInstance, ctx: AppContext): void {
     async (request) => listOwnMonth(ctx, authOf(request).user.id, request.query.month),
   );
 
+  routes.get(
+    '/api/documents/open',
+    {
+      onRequest: requireCapability(Capability.ReadOpenDiaries),
+      schema: {
+        tags: TAG,
+        summary:
+          '開放日記: open entries in a Beijing calendar month, newest first (read each with GET /api/documents/:id)',
+        querystring: OpenDocumentsQuery,
+        response: { 200: OpenDocumentList },
+      },
+    },
+    async (request) => listOpenMonth(ctx, request.query.month),
+  );
+
   routes.post(
     '/api/documents',
     {
@@ -123,7 +141,8 @@ export function documentRoutes(app: FastifyInstance, ctx: AppContext): void {
         summary:
           'One entry. Owner (view=owner): what leaders see, my pending draft, and submitted comments, which ' +
           "are then marked seen. Leader (view=leader): the last submitted version only, other leaders' " +
-          'submitted comments and my own comment; each read is audited.',
+          'submitted comments and my own comment; each read is audited. Anyone else, for an open entry ' +
+          '(view=reader): the submitted version and submitted comments.',
         params: DocumentIdParams,
         response: { 200: EntryView },
       },

@@ -537,7 +537,9 @@ its entries in the API explorer (D20), so it can be checked by hand before any s
 6. **Leader API:** lists, calendar counts, comments, open approvals, read audit. *(Done. The whole sharing
    endpoint `POST /api/documents/:id/access` arrived here, owner actions included, because approvals need
    requests and the seed now goes through it.)*
-7. **Open diaries API:** the month list of open entries and the reader view of an open entry.
+7. **Open diaries API:** the month list of open entries and the reader view of an open entry. *(Done. The
+   list carries no content; expanding a row reads the entry through `GET /api/documents/:id`, which checks
+   access again. Readers' reads aren't audited: the audit is for leaders.)*
 8. **Account API:** profile, password change, devices, preferences.
 9. **報數 API:** summary, latest, settings, count date and per-date limit, admin list, delete by date range,
    scheduler, job runs.

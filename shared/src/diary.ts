@@ -1,4 +1,4 @@
-/** Diary entries (spec §5): the owner's view, the leader's view, comments and sharing. */
+/** Diary entries (spec §5): the owner's, leader's and reader's views, comments and sharing. */
 import { z } from 'zod';
 import { Access } from './roles.js';
 import { ENTRY_LIMITS } from './limits.js';
@@ -91,7 +91,26 @@ export const LeaderEntryView = z.object({
   myComment: MyComment.nullable(),
 });
 
-export const EntryView = z.discriminatedUnion('view', [OwnerEntryView, LeaderEntryView]);
+/**
+ * `GET /api/documents/:id` for any other signed-in user, when the entry is open (spec §5.3): the last
+ * submitted version and the submitted comments. Never drafts, history or draft comments.
+ */
+export const ReaderEntryView = z.object({
+  view: z.literal('reader'),
+  id: z.uuid(),
+  diaryDate: z.iso.date(),
+  author: EntryAuthor,
+  title: z.string(),
+  body: z.string(),
+  submittedAt: z.iso.datetime(),
+  comments: z.array(SubmittedComment),
+});
+
+export const EntryView = z.discriminatedUnion('view', [
+  OwnerEntryView,
+  LeaderEntryView,
+  ReaderEntryView,
+]);
 export type EntryView = z.infer<typeof EntryView>;
 
 /** 暫存 (`draft`) or 提交 (`submitted`) the leader's comment. A submitted comment needs some text or a photo. */
@@ -110,6 +129,23 @@ export const AccessChangeResponse = z.object({ access: Access });
 export const Month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 
 export const MyDocumentsQuery = z.object({ month: Month });
+
+/** `GET /api/documents/open`: the 開放日記 list for one Beijing month. */
+export const OpenDocumentsQuery = z.object({ month: Month });
+
+/** Open entries, newest first; content comes from `GET /api/documents/:id` when a row is expanded. */
+export const OpenDocumentList = z.object({
+  documents: z.array(
+    z.object({
+      id: z.uuid(),
+      title: z.string(),
+      diaryDate: z.iso.date(),
+      author: EntryAuthor,
+      /** Submitted comments (spec §6.1's comment mark). */
+      commentCount: z.number().int(),
+    }),
+  ),
+});
 
 export const MyDocumentList = z.object({
   documents: z.array(

@@ -1,8 +1,9 @@
 /**
- * Reading one entry, for whoever may (docs/ARCHITECTURE.md §7.1). The owner sees everything and their submitted
- * comments, which are then marked seen. A leader sees the last submitted version only, never the owner's
- * draft, and each leader read of someone else's entry is written to the read audit, which owners never see
- * (spec §5.4).
+ * Reading one entry, for whoever may (docs/ARCHITECTURE.md §7.1):
+ *  - the owner sees everything, plus submitted comments, which are then marked seen;
+ *  - a leader sees the last submitted version only, never the owner's draft, and each read is written to the
+ *    read audit, which owners never see (spec §5.4);
+ *  - anyone else signed in sees an open entry's submitted version and submitted comments.
  */
 import { randomUUID } from 'node:crypto';
 import { and, desc, eq, isNull } from 'drizzle-orm';
@@ -89,35 +90,43 @@ export async function readEntry(ctx: AppContext, reader: Reader, id: string): Pr
     };
   }
 
-  if (view === 'leader' && row.contentCt && row.contentNonce && row.lastSubmittedAt) {
+  // Leaders and readers see the same submitted version; `view` was non-null, so the entry is submitted.
+  if (!row.contentCt || !row.contentNonce || !row.lastSubmittedAt) throw notFound();
+  const author = (await peopleByIds(ctx, [row.ownerId])).get(row.ownerId);
+  if (!author) throw notFound();
+  const submitted = {
+    id,
+    diaryDate: row.diaryDate,
+    author,
+    title: row.title,
+    body: openText(
+      dek,
+      { ciphertext: row.contentCt, nonce: row.contentNonce },
+      fieldAad.documentContent(id),
+    ),
+    submittedAt: row.lastSubmittedAt.toISOString(),
+  };
+  const shownComments = (
+    await submittedComments(ctx, id, dek, view === 'leader' ? reader.id : undefined)
+  ).map(({ id: commentId, authorName, submittedAt, body }) => ({
+    id: commentId,
+    authorName,
+    submittedAt,
+    body,
+  }));
+
+  if (view === 'leader') {
     await audit(ctx, reader, id);
-    const author = (await peopleByIds(ctx, [row.ownerId])).get(row.ownerId);
-    if (!author) throw notFound();
-    const others = await submittedComments(ctx, id, dek, reader.id);
     return {
       view: 'leader',
-      id,
-      diaryDate: row.diaryDate,
+      ...submitted,
       access: row.access,
-      author,
-      title: row.title,
-      body: openText(
-        dek,
-        { ciphertext: row.contentCt, nonce: row.contentNonce },
-        fieldAad.documentContent(id),
-      ),
-      submittedAt: row.lastSubmittedAt.toISOString(),
-      comments: others.map(({ id: commentId, authorName, submittedAt, body }) => ({
-        id: commentId,
-        authorName,
-        submittedAt,
-        body,
-      })),
+      comments: shownComments,
       myComment: await myComment(ctx, id, dek, reader.id),
     };
   }
-
-  // Readers of open entries arrive with delivery slice 7.
+  if (view === 'reader') return { view: 'reader', ...submitted, comments: shownComments };
+  // SYS_ADMIN's metadata view isn't served here (the route doesn't admit them anyway).
   throw notFound();
 }
 

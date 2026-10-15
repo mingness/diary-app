@@ -6,6 +6,7 @@ coverage/
 # Secrets: never commit (engineering standards §12.3)
 .env
 .env.*
+.env-*
 !.env.example
 *.keystore
 *.jks

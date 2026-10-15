@@ -8,6 +8,7 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { eq } from 'drizzle-orm';
 import {
+  AuthOptions,
   CaptchaResponse,
   ErrorCode,
   ForgotPasswordRequest,
@@ -242,10 +243,28 @@ export function authRoutes(
     },
   );
 
+  routes.get(
+    '/api/auth/options',
+    {
+      schema: {
+        tags: AUTH_TAG,
+        summary: 'What the sign-in screens may offer, such as registering',
+        response: { 200: AuthOptions },
+      },
+    },
+    async () => ({ registration: ctx.config.registrationOpen }),
+  );
+
   routes.post(
     '/api/auth/register',
     {
       config: { rateLimit: limits.register },
+      // Before the body is read, so a closed server says so instead of complaining about the form.
+      onRequest: async () => {
+        if (!ctx.config.registrationOpen) {
+          throw new HttpError(403, ErrorCode.RegistrationClosed, 'Registration is closed');
+        }
+      },
       schema: {
         tags: AUTH_TAG,
         summary: 'Create a normal user account (no email verification, spec §4.2)',

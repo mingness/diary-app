@@ -320,6 +320,10 @@ for any submitted entry, their own included, and the review lists include their 
   It needs the CAPTCHA and is rate-limited, because anyone can lock any account by name. SYS_ADMIN accounts
   can't be locked from this public form (otherwise anyone could lock every admin out); a locked-out admin is
   recovered by another admin or the CLI (`set-password`, `reset-totp`).
+- **Closing registration:** `REGISTRATION_OPEN=false` (any environment, production included) makes
+  `POST /api/auth/register` answer 403 `registration_closed` before reading the body, and
+  `GET /api/auth/options` tells the sign-in screens to hide the register link. SYS_ADMINs still create
+  accounts. `deploy/make-env.sh` writes it closed (agreed 2026-10-15: no self-registration for now).
 - **Changing one's own authenticator (Q1):** a SYS_ADMIN who still has their app can move to a new one from
   the account page. Step one (`POST /api/me/totp/change`) needs the password and a current code (both on the
   sign-in throttles) and stores a new secret as pending (sealed under its own label, `profile:<id>:totp-pending`);

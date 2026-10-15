@@ -61,6 +61,8 @@ export const en: Messages = {
   'enrol.done': 'Authenticator set up. You’ll need a code from it each time you sign in.',
 
   'register.title': 'Create an account',
+  'register.closed':
+    'Registration is closed at the moment. To get an account, please contact an administrator.',
   'register.usernameHint':
     '3–32 characters: letters, digits or . _ -, starting with a letter or digit. It can’t be changed later.',
   'register.familyName': 'Family name',
@@ -588,6 +590,7 @@ export const en: Messages = {
   'error.captcha_failed': 'The verification answer was wrong or expired. Here’s a new one.',
   'error.username_taken': 'This username is already taken.',
   'error.email_taken': 'This email address is already in use.',
+  'error.registration_closed': 'Registration is closed at the moment.',
   'error.totp_required': 'Please enter your authenticator code first.',
   'error.totp_invalid': 'Wrong or already used code. Please wait for the next one.',
   'error.csrf_failed': 'Your connection expired. Please reload the page.',

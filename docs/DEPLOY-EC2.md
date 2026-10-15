@@ -89,8 +89,10 @@ for a password, then shows a QR code for your authenticator app and asks for a c
 docker compose -f deploy/compose.yaml exec server node server/dist/cli.js create-sysadmin <username>
 ```
 
-Sign in at `https://<domain>` as that admin. Users register themselves; the admin creates course leaders and
-further admins under 用戶. To install the app on a phone, open the address in Chrome (Android: menu → Install
+Sign in at `https://<domain>` as that admin, and create accounts under 用戶. Self-registration is **off** on a
+deploy (`REGISTRATION_OPEN=false`, written by `make-env.sh`): the sign-in screen has no register link and the
+server refuses registrations. To open it, set `REGISTRATION_OPEN=true` in `deploy/.env` and run
+`docker compose -f deploy/compose.yaml up -d server`; set it back to `false` the same way. To install the app on a phone, open the address in Chrome (Android: menu → Install
 app) or Safari (iPhone: Share → Add to Home Screen).
 
 ## Everyday tasks

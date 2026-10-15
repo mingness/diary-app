@@ -24,6 +24,8 @@ cat >"$target" <<ENV
 # Written by deploy/make-env.sh on $(date -u +%Y-%m-%d). Secrets: keep a copy offline, never commit.
 DOMAIN=$domain
 LOG_LEVEL=info
+# New users can't register themselves; admins create accounts under 用戶. Set to true to open it.
+REGISTRATION_OPEN=false
 
 POSTGRES_PASSWORD=$(hex 16)
 # Losing either keyring loses the data it protects. Back them up separately from database backups.

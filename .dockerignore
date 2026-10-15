@@ -5,6 +5,7 @@
 .git
 **/.env
 **/.env.*
+**/.env-*
 deploy/backups
 docs
 web/test-results

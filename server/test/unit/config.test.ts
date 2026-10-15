@@ -214,6 +214,22 @@ describe('loadConfig', () => {
     });
   });
 
+  describe('REGISTRATION_OPEN', () => {
+    it('is open unless turned off, in production too', () => {
+      expect(loadConfig(validEnv()).registrationOpen).toBe(true);
+      expect(
+        loadConfig(validEnv({ NODE_ENV: 'production', REGISTRATION_OPEN: 'false' }))
+          .registrationOpen,
+      ).toBe(false);
+    });
+
+    it('rejects anything but true or false', () => {
+      expect(configErrorFor(validEnv({ REGISTRATION_OPEN: 'no' })).invalidVariables).toEqual([
+        'REGISTRATION_OPEN',
+      ]);
+    });
+  });
+
   describe('TRUST_PROXY_HOPS', () => {
     it('trusts no proxy unless told how many there are', () => {
       expect(loadConfig(validEnv()).trustProxyHops).toBe(0);

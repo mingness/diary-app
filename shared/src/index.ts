@@ -44,6 +44,8 @@ export const ErrorCode = {
   TranslationFailed: 'translation_failed',
   /** The translation provider didn't answer within 10 seconds (504, spec §8). */
   TranslationTimeout: 'translation_timeout',
+  /** This server doesn't take new registrations at the moment (403; REGISTRATION_OPEN=false). */
+  RegistrationClosed: 'registration_closed',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 

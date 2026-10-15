@@ -43,6 +43,12 @@ export const CaptchaResponse = z.object({
   svg: z.string(),
 });
 
+/** What the sign-in screens may offer before anyone signs in. */
+export const AuthOptions = z.object({
+  /** Whether new users may register themselves. When false, the web app hides the register link. */
+  registration: z.boolean(),
+});
+
 export const LoginRequest = CaptchaAnswer.extend({
   username: z.string().max(64),
   password: z.string().max(256),

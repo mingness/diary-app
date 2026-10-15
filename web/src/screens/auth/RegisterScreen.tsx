@@ -7,6 +7,7 @@ import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useMutation } from '@tanstack/react-query';
 import { Email, ErrorCode, Password, Username } from '@diary/shared';
+import { useAuthOptions } from '../../api/auth.js';
 import { ApiError, api } from '../../api/client.js';
 import { AuthLayout } from '../../components/AuthLayout.js';
 import { Button } from '../../components/Button.js';
@@ -56,6 +57,23 @@ export function checkRegistration(form: Form): Problems {
 }
 
 export function RegisterScreen() {
+  const { t } = useI18n();
+  const options = useAuthOptions();
+  if (options.data?.registration === false) {
+    return (
+      <AuthLayout>
+        <h1>{t('register.title')}</h1>
+        <Notice kind="info">{t('register.closed')}</Notice>
+        <div className={styles.links}>
+          <Link to="/login">{t('auth.backToLogin')}</Link>
+        </div>
+      </AuthLayout>
+    );
+  }
+  return <RegisterForm />;
+}
+
+function RegisterForm() {
   const { t, tError } = useI18n();
   const navigate = useNavigate();
   const [form, setForm] = useState<Form>(EMPTY);

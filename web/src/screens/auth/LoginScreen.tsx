@@ -7,6 +7,7 @@ import type { FormEvent } from 'react';
 import { Link, useLocation } from 'react-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ErrorCode, type LoginResponse } from '@diary/shared';
+import { useAuthOptions } from '../../api/auth.js';
 import { ApiError, api, setCsrfToken } from '../../api/client.js';
 import { afterLogin, ANONYMOUS, SESSION_KEY, useSession } from '../../api/session.js';
 import { AuthLayout } from '../../components/AuthLayout.js';
@@ -29,6 +30,7 @@ export function LoginScreen() {
 }
 
 function PasswordStep() {
+  const options = useAuthOptions();
   const { t, tError } = useI18n();
   const queryClient = useQueryClient();
   const location = useLocation();
@@ -142,7 +144,8 @@ function PasswordStep() {
       </Button>
       <div className={styles.links}>
         <Link to="/forgot-password">{t('auth.toForgot')}</Link>
-        <Link to="/register">{t('auth.toRegister')}</Link>
+        {/* Hidden until the server says registering is open, so a closed one never flashes the link. */}
+        {options.data?.registration && <Link to="/register">{t('auth.toRegister')}</Link>}
       </div>
     </form>
   );

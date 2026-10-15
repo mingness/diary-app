@@ -61,6 +61,7 @@ export const zhHant = {
   'enrol.done': '驗證器已設定。下次登入時需要輸入驗證碼。',
 
   'register.title': '註冊',
+  'register.closed': '目前暫停開放註冊。如需帳號，請聯絡管理員。',
   'register.usernameHint':
     '3–32 個字元：英文字母、數字或 . _ -，以字母或數字開頭。註冊後不能更改。',
   'register.familyName': '姓',
@@ -569,6 +570,7 @@ export const zhHant = {
   'error.captcha_failed': '驗證碼答案不正確或已過期，已換一個新的驗證碼。',
   'error.username_taken': '這個用戶名已被使用。',
   'error.email_taken': '這個電郵地址已被使用。',
+  'error.registration_closed': '目前暫停開放註冊。',
   'error.totp_required': '請先輸入驗證碼。',
   'error.totp_invalid': '驗證碼不正確或已使用過，請等下一個驗證碼。',
   'error.csrf_failed': '連線已過期，請重新載入頁面。',

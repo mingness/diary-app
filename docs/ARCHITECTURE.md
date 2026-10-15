@@ -276,7 +276,7 @@ bodies are ignored.
 | `GET /api/documents/:id`, `/:id/versions` | – | per §7.1 | per §7.1 | ❌ |
 | `POST /api/documents/:id/access` (`request`/`withdraw`/`revoke`) | – | own | own | ❌ |
 | `POST /api/documents/:id/access` (`approve`/`decline`/`revoke`) | – | ❌ | ✅ submitted, own included | ❌ |
-| `GET /api/leader/documents?date=&page=&size=` and `?user=&month=` → per entry `myCommentState, otherLeaderCommented, access` | – | ❌ | ✅ submitted only | ❌ |
+| `GET /api/leader/documents?date=&page=&size=`, `?user=&month=` and `?unread=true&page=&size=` → per entry `myCommentState, otherLeaderCommented, unread, access` | – | ❌ | ✅ submitted only | ❌ |
 | `GET /api/leader/calendar?month=` → submitted-entry count per day | – | ❌ | ✅ | ❌ |
 | `GET /api/leader/open-requests` | – | ❌ | ✅ | ❌ |
 | `GET /api/leader/users?month=` → names + entries this month | – | ❌ | ✅ | ❌ |
@@ -507,7 +507,9 @@ cover just those files.
   seeded plaintext.
 - **Activity log** for SYS_ADMINs (§8.9), metadata only, kept 90 days.
 - **Read audit log:** every time a leader opens an entry, the server records (leader, document, time). It's a
-  security log for investigating a stolen leader account and is **not shown to diary owners** (agreed).
+  security log for investigating a stolen leader account and is **not shown to diary owners** (agreed). It
+  also gives each leader their own 未讀 list (entries they haven't opened since the last submission; last 90
+  days, the log's retention; never their own entries), agreed 2026-10-15.
 - Error responses use the shape `{code, message, requestId}`.
 - **Health checks:** `/healthz` reports that the process is up. `/readyz` checks the DB, that migrations are
   current, and that the keyrings are loaded and valid.
@@ -593,7 +595,18 @@ states. Each slice is one screen group, with Playwright e2e tests at 360 px and 
     `<style>` and scripts stay blocked. Font sizes are `85%`, `1.25em` and `1.5em`, because the sanitiser's
     pattern rejects `125%`; `web/test/sanitiser-agreement.test.ts` checks every toolbar value against it.
     Leaders' own diaries use these screens; the leader's review and comment editor are slice 14.)*
-14. **Leader review and open requests.**
+14. **Leader review and open requests.** *(Done. 批閱 opens on today's submitted entries; the day, page,
+    page size, student and open entry live in the address. Three panes on desktop, two on tablets, and on
+    phones an entry opens full screen. The comment editor shares the diary editor's toolbar and photo
+    handling; its autosave only runs while the comment isn't submitted, since saving a submitted comment as a
+    draft takes it away from the student. The requests badge polls every minute. Leaders' tabs: 批閱 · 申請 ·
+    日記 · 我的 on phones, plus 開放日記 on desktop; 報數 joins in slice 16. Afterwards (2026-10-15): 上一篇 /
+    下一篇 and a 連續閱讀 feed on every list, one page-level guard for unsaved comments (`UnsavedGuard`), and
+    開放日記 read-only for leaders, with their own comment listed there. Then 開放日記 became a filtered,
+    read-only feed (calendar day and author, worked out from the month's list; no page per entry), and the
+    leaders got 未讀 (`?unread=true`, from the read audit). Finally (agreed 2026-10-15, "fewest clicks"):
+    every list is a continuous feed; 開放申請 became a filter of the one 批閱 tab; no page per entry and no
+    one-at-a-time view, so the stepper and reading pane are gone.)*
 15. **SYS_ADMIN screens**, including Attention and activity.
 16. **報數 and account.**
 17. **Installable web app:** manifest, service worker, update toast, install help. Then the phone check for D10.

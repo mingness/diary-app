@@ -7,7 +7,7 @@ import { EditorContent, useEditor } from '@tiptap/react';
 import { contentExtensions } from './schema.js';
 import styles from './content.module.css';
 
-export function RichContent({ html, label }: { html: string; label?: string }) {
+export function RichContent({ html }: { html: string }) {
   const editor = useEditor(
     {
       extensions: contentExtensions(),
@@ -15,7 +15,8 @@ export function RichContent({ html, label }: { html: string; label?: string }) {
       editable: false,
       // Tiptap would add a <style> element, which the Content-Security-Policy blocks; content.module.css has it.
       injectCSS: false,
-      editorProps: { attributes: label ? { 'aria-label': label } : {} },
+      // Read-only text, not an input: without this, ProseMirror presents it as an (unnamed) text box.
+      editorProps: { attributes: { role: 'none' } },
     },
     [html],
   );

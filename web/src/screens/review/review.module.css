@@ -1,0 +1,120 @@
+.muted {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.amber {
+  color: var(--amber);
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+
+/* 未讀 and 申請開放, side by side above the calendar. */
+.quickFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.students {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.studentsHeading {
+  font-size: 1rem;
+}
+
+.search {
+  width: 100%;
+  min-height: var(--touch-compact);
+  padding: var(--space-1) var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+}
+
+.studentList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 20rem;
+  overflow-y: auto;
+}
+
+.student {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--touch-compact);
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-input);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.student:hover,
+.student[aria-pressed='true'] {
+  background: var(--primary-soft);
+}
+
+.student[aria-pressed='true'] {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+/* A share request: one line with an amber edge and small 批准開放 / 婉拒. */
+.approval {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border-left: 3px solid var(--amber);
+  font-size: var(--text-sm);
+}
+
+.approvalActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.comment {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.commentHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.commentBody {
+  min-height: 8rem;
+}
+
+.commentActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.commentCollapsed {
+  display: flex;
+  justify-content: flex-end;
+}

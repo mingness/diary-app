@@ -21,10 +21,14 @@ export default defineConfig<E2eOptions>({
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: { baseURL, trace: 'retain-on-failure', screenshot: 'only-on-failure' },
   // Each project signs in as its own seeded user, so projects running side by side never share settings.
+  // Leaders are shared by two projects, so leader tests work on entries their own test just created.
   projects: [
-    { name: 'phone-zh', use: { ...phone, lang: 'zh-Hant', user: 'chenmd' } },
-    { name: 'phone-en', use: { ...phone, lang: 'en', user: 'zhangsf' } },
-    { name: 'desktop-zh', use: { ...desktop, lang: 'zh-Hant', user: 'wangdt' } },
-    { name: 'desktop-en', use: { ...desktop, lang: 'en', user: 'wuml' } },
+    { name: 'phone-zh', use: { ...phone, lang: 'zh-Hant', user: 'chenmd', leader: 'leader.lin' } },
+    { name: 'phone-en', use: { ...phone, lang: 'en', user: 'zhangsf', leader: 'leader.huang' } },
+    {
+      name: 'desktop-zh',
+      use: { ...desktop, lang: 'zh-Hant', user: 'wangdt', leader: 'leader.lin' },
+    },
+    { name: 'desktop-en', use: { ...desktop, lang: 'en', user: 'wuml', leader: 'leader.huang' } },
   ],
 });

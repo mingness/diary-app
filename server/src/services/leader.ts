@@ -8,6 +8,7 @@ import type { z } from 'zod';
 import type { LeaderDocumentRow } from '@diary/shared';
 import type { AppContext } from '../context.js';
 import { documents } from '../db/schema.js';
+import { ACTIVITY_RETENTION_MS } from '../jobs.js';
 import { monthDates } from '../domain/count/schedule.js';
 import { diaryKeepers, peopleByIds } from './people.js';
 
@@ -15,6 +16,16 @@ type Row = z.infer<typeof LeaderDocumentRow>;
 
 /** Entries a leader reviews: every submitted one. */
 const reviewable: SQL[] = [isNotNull(documents.firstSubmittedAt)];
+
+/**
+ * The leader hasn't opened the entry since its last submission (the read audit, docs/ARCHITECTURE.md §9), and
+ * didn't write it.
+ */
+const unreadBy = (leaderId: string): SQL => sql`(
+  ${documents.ownerId} <> ${leaderId} AND NOT EXISTS (
+    SELECT 1 FROM read_audit r
+     WHERE r.document_id = ${documents.id} AND r.leader_id = ${leaderId}
+       AND r.read_at >= ${documents.lastSubmittedAt}))`;
 
 const inMonth = (month: string): SQL[] => {
   const { first, next } = monthDates(month);
@@ -44,6 +55,7 @@ async function rows(
         SELECT 1 FROM comments c
          WHERE c.document_id = documents.id AND c.state = 'submitted'
            AND (c.author_id IS NULL OR c.author_id <> ${leaderId}))`,
+      unread: sql<boolean>`${unreadBy(leaderId)}`,
     })
     .from(documents)
     .where(and(...where))
@@ -65,6 +77,7 @@ async function rows(
         access: r.access,
         myCommentState: r.myState ?? 'none',
         otherLeaderCommented: r.othersCommented,
+        unread: r.unread,
         submittedAt: r.lastSubmittedAt.toISOString(),
       },
     ];
@@ -88,6 +101,28 @@ export async function documentsOnDate(
   size: number,
 ) {
   const where = [...reviewable, eq(documents.diaryDate, date)];
+  const [documentsFound, total] = await Promise.all([
+    rows(ctx, leaderId, where, [desc(documents.lastSubmittedAt), asc(documents.id)], {
+      limit: size,
+      offset: (page - 1) * size,
+    }),
+    count(ctx, where),
+  ]);
+  return { documents: documentsFound, total, page, size };
+}
+
+/**
+ * 新: submitted entries this leader hasn't read since they were last submitted, newest first, paged. Only the
+ * last 90 days count: the read audit is kept that long, so anything older would look unread for ever.
+ */
+export async function unreadDocuments(
+  ctx: AppContext,
+  leaderId: string,
+  page: number,
+  size: number,
+) {
+  const since = new Date(ctx.clock().getTime() - ACTIVITY_RETENTION_MS);
+  const where = [...reviewable, gte(documents.lastSubmittedAt, since), unreadBy(leaderId)];
   const [documentsFound, total] = await Promise.all([
     rows(ctx, leaderId, where, [desc(documents.lastSubmittedAt), asc(documents.id)], {
       limit: size,

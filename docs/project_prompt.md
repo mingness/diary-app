@@ -240,7 +240,7 @@ REPORTED_TODAY今日報告: <today> (entries紀錄: <n>)
 
 ## 8. Translation Feature
 
-- Below diary content and below comments: two buttons in the submit-button style —
+- Below diary content and below comments: two small buttons at the right, low-key so they don't compete with the text (changed 2026-10-15; they were in the submit-button style) —
   - **翻译**: translate the text from English to 繁體中文 (expert level)
   - **Translate**: translate from 繁體中文 to English (expert level)
 - The result is displayed as **plain text below the buttons — never inside a text box**; a new click replaces it; buttons disable while translating.
@@ -269,8 +269,8 @@ Build this only if testing on the users' actual phones shows the installable web
 
 ## 10. UX Conventions (accumulated user requirements)
 
-1. Single right-top **language toggle** (shows the *other* language's name) on every page; default 繁體中文; never two separate buttons.
-2. Buttons 翻译 / Translate / 更新 must match the **submit** button style.
+1. Single right-top **language switch** on every page, showing both languages with the one in use highlighted (changed 2026-10-15: it used to show only the *other* language's name); default 繁體中文.
+2. Button 更新 matches the **submit** button style; 翻譯 / Translate are small and set to the right (changed 2026-10-15).
 3. All rows/tables show values plainly; no key-name labels except the `Comment:` label.
 4. Editing always resumes saved content; drafts auto-save; nothing is lost on navigation.
 5. Invalid numeric input is trimmed and reported to the user, never silently accepted.

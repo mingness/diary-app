@@ -20,12 +20,22 @@ async function expectNoSidewaysScroll(page: Page) {
   expect(overflow).toBeLessThanOrEqual(0);
 }
 
-test('the language toggle switches every string and is remembered', async ({ page, t, lang }) => {
+test('the language switch shows the language in use, switches every string and is remembered', async ({
+  page,
+  t,
+  lang,
+}) => {
+  const names = { 'zh-Hant': '中文', en: 'English' } as const;
+  const other = lang === 'en' ? 'zh-Hant' : 'en';
   await page.goto('/login');
   await expect(page.locator('html')).toHaveAttribute('lang', lang);
-  await page.getByRole('button', { name: t('lang.switch') }).click();
+  const languages = page.getByRole('group', { name: t('lang.label') });
+  await expect(languages.getByRole('button', { name: names[lang] })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await languages.getByRole('button', { name: names[other] }).click();
 
-  const other = lang === 'en' ? 'zh-Hant' : 'en';
   await expect(page.locator('html')).toHaveAttribute('lang', other);
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('lang', other);
@@ -86,4 +96,27 @@ test('unknown addresses show "not found" inside the app', async ({ userPage, t }
   await userPage.goto('/no-such-page');
   await expect(userPage.getByRole('heading', { name: t('state.notFound') })).toBeVisible();
   await expect(userPage.getByRole('navigation', { name: t('nav.label') })).toBeVisible();
+});
+
+test('English text uses Latin fonts first, so its punctuation isn’t full-width', async ({
+  page,
+  lang,
+}) => {
+  test.skip(lang !== 'en', 'Chinese keeps its full-width punctuation');
+  await page.goto('/login');
+  // The apostrophe's width relative to the text size, in the interface font and the diary font.
+  const widths = await page.evaluate(() =>
+    ['--font-ui', '--font-serif'].map((token) => {
+      const span = document.createElement('span');
+      span.style.fontFamily = `var(${token})`;
+      span.style.fontSize = '100px';
+      span.style.whiteSpace = 'pre';
+      span.textContent = '’';
+      document.body.append(span);
+      const width = span.getBoundingClientRect().width / 100;
+      span.remove();
+      return width;
+    }),
+  );
+  for (const width of widths) expect(width).toBeLessThan(0.5);
 });

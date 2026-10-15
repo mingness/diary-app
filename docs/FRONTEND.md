@@ -45,8 +45,12 @@ just hue.
 ### 2.2 Type
 
 - **Fonts are system fonts only.** CJK web fonts run to megabytes and can't come from a CDN (§12.4).
-  - UI: `"PingFang TC", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif`.
-  - Diary and comment text: `"Songti TC", "Noto Serif TC", "PMingLiU", serif`.
+  - UI: `"PingFang TC", "Noto Sans TC", "Noto Sans CJK TC", "Microsoft JhengHei", system-ui, sans-serif`.
+  - Diary and comment text: `"Songti TC", "Noto Serif TC", "Noto Serif CJK TC", "PMingLiU", serif`.
+  - Linux names its Noto fonts "CJK", hence both names.
+  - **In English the Latin system fonts come first** (Segoe UI, Roboto, Noto Sans, Helvetica, Arial… and
+    Georgia, Times New Roman, Noto Serif… for diary text), then the Chinese ones for any Chinese characters. A
+    Chinese font draws ’ and “ full-width, which is right in Chinese and wrong in English (2026-10-15).
 - **Editor font choices** (明體 / 黑體 / 楷體) map to these stacks. 楷體 falls back to the serif stack where a Kai
   font isn't installed, so it may look the same as 明體 on some phones (accepted; noted in the editor help).
 - **Scale** (multiples of the user's base size): small ×0.85, base ×1, large ×1.15, title ×1.35, display ×1.75.
@@ -65,12 +69,13 @@ just hue.
 | Role | Phone (< 768 px): bottom tab bar | Desktop (≥ 1024 px): top bar |
 |---|---|---|
 | NORMAL_USER | 日記 · 開放日記 · 報數 · 我的 | same four, as top links |
-| COURSE_LEADER | 批閱 · 申請 (badge) · 日記 · 報數 · 我的 | 批閱 · 開放申請 (badge) · 我的日記 · 開放日記 · 報數 · avatar |
+| COURSE_LEADER | 批閱 (badge: share requests) · 日記 · 開放日記 · 報數 · 我的 | 批閱 (badge) · 我的日記 · 開放日記 · 報數 · 我的 |
 | SYS_ADMIN | 用戶 (badge) · 日記 · 報數 · 重設 (badge) · 我的 | 注意 (badge) · 用戶 · 日記管理 · 報數管理 · 密碼重設 (badge) · username |
 
 - The tab bar replaces the spec's My Diary / Open Diary toggle and its scattered header buttons (§6.2, §7.4).
   "Go Diary" from the count page is simply the 日記 tab.
-- The language toggle (spec §10.1) sits top right on every screen and shows the other language's name.
+- The language switch (spec §10.1) sits top right on every screen and shows both languages, the one in use
+  highlighted (changed 2026-10-15: the content is mostly Chinese either way, so users need to see which is on).
 - Between 768 and 1024 px, the tab bar stays and the leader and admin screens use two panes instead of three.
 - Detail screens (editor, entry, comment) replace the tab bar with a back button. The back button and the
   browser/phone back always return to the list you came from, at the same month and scroll position.
@@ -93,12 +98,10 @@ Each screen lists what it needs from the API. The API column feeds the ARCHITECT
 ### 4.2 My diary (users and leaders)
 
 - **Top:** the 撰寫日記 button, full width, then month navigation (« ‹ 2026 年 10 月 › », year jumps at the ends).
-- **Entry cards**, newest first, each showing:
-  - title and date (with weekday)
-  - a state chip: 草稿・未提交 / 已提交 / 已提交・有未提交的修改
-  - an access chip: 私人 / 等待開放 / 已開放
-  - a comment chip ("2 則批注"), marked when there is a comment the owner hasn't seen yet
-- Tapping a card opens the entry (4.4), **F1**.
+- **The month as a continuous feed (2026-10-15, "fewest clicks"):** every entry in full, newest first, each
+  with its state chip (草稿・未提交 / 已提交 / 已提交・有未提交的修改), access chip (私人 / 等待開放 / 已開放),
+  comment count, a small 編輯, its share request and its comments (新 on ones the owner hasn't seen). No
+  separate entry page: entries load as they come near the screen, and showing a comment marks it seen.
 - **Polling** every 30 s while the screen is visible. New comments raise the toast 有新批注！ and refresh the
   list. Polling stops in editors and background tabs.
 - **Empty month:** "這個月還沒有日記" plus the write button.
@@ -133,12 +136,28 @@ Each screen lists what it needs from the API. The API column feeds the ARCHITECT
 
 - **Read-only:** title, a meta row of values only (date, author for non-owners, access chip, comment count),
   then the body.
-- **Translation:** 翻譯 and Translate buttons, with the result shown as plain text below them. When the server
+- **Translation:** 翻譯 and Translate as small buttons at the right (low-key, 2026-10-15), with the result shown as plain text below them. When the server
   has no translation provider (`GET /api/me` → `features.translation: false`), the buttons are greyed out.
 - **Comments:** the `Comment:` label, then one card per submitted comment (leader name, date, text, its own
   translate buttons).
 - **Owner actions:** 編輯 (opens 4.3), and the share request toggle.
-- **Open Diary tab:** the same screen without the owner actions, reached from a list of open entries by month.
+- **開放日記 (revised 2026-10-15):** just for reading. One month as a continuous feed of whole entries
+  (title, date, author, text, translate, comments, a leader's own included), with no chips, counts, editing
+  or sharing controls, the reader's own open entries included. Filters: a day on the calendar and/or an
+  author (those with open entries that month), kept in the address; beside the feed on wide screens, folded
+  under a one-line summary on phones. No page per entry. Stopping sharing happens elsewhere: the owner's
+  share toggle, or 取消開放 beside the 已開放 chip in the leaders' review.
+- **Visual weight (2026-10-15):** the entry is the most visible thing. Notes (draft, pending changes) are
+  muted lines, not boxes; an open entry has no notice at all (in review, a small 取消開放 beside its chip); a
+  share request is one line with an amber edge and small 批准開放 / 婉拒. Without a translation provider the
+  translate buttons are greyed, the reason in their tooltip. Formatting toolbars, translate and stepping use the compact
+  size (`--touch-compact`, 40 px at 18 px text); main actions keep 45 / 52 px.
+- **Posted comments (2026-10-15):** once submitted, a leader's comment reads like the others, with 編輯 to
+  reopen it in the editor (and 取消 to close it again). Drafts and new comments open in the editor.
+- **Everything is a continuous feed (2026-10-15):** 我的日記, 開放日記 and 批閱 show whole entries one after
+  another, with no page per entry and no one-at-a-time view; filters (month, day, author or student) choose
+  what the feed holds. Entries load as they come near the screen, so a leader's read audit only records what
+  they reached.
 - **API:** `GET documents/open?month=` → rows `id, title, diaryDate, author, commentCount`;
   `GET documents/:id` → `view` (`owner` / `leader` / `reader`) + content + submitted comments
   `{id, authorName, submittedAt, body}` (`authorName` null for a former leader; the owner also gets `isNew`);
@@ -171,27 +190,28 @@ Each screen lists what it needs from the API. The API column feeds the ARCHITECT
 - **API:** `GET/PUT me` (including `fontSize`, `theme`), `POST me/password`, `GET/DELETE me/sessions`,
   `POST me/totp/*`.
 
-### 4.7 Leader review (desktop first)
+### 4.7 Leader review: 批閱 (revised 2026-10-15)
 
-Three panes, which stack on narrow screens:
+One tab and one feed of submitted entries, each in full: the text, translate, the other leaders' comments,
+**my comment** and, for a share request, 批准開放 (with a confirm dialog) / 婉拒 (**F3**). An open entry shows
+its 已開放 chip with a small 取消開放 beside it.
 
-1. **Calendar:** Chinese weekday headers, today ringed, a dot on days with submitted entries. Below it, the
-   學員 list with search and monthly counts.
-2. **Day list:** opens on today. Each row shows title and author, plus chips for comment state (尚無批注 / 我的
-   批注：草稿 / 我已批注 / 其他導師已批注) and 申請開放. Picking a user instead lists their entries by month.
-   Paging follows spec §6.1 (20 per page, adjustable).
-3. **Reading pane:** the entry, translate buttons, other leaders' comments, then **my comment** with a small
-   toolbar, 暫存 and 提交批注. For a `Wait for open` entry, an amber bar offers 批准開放 (with a confirm
-   dialog) and 婉拒, **F3**.
-
-- **On a phone:** 批閱 is calendar + day list; tapping an entry opens the reading pane full screen.
-- **開放申請 tab:** a queue of pending requests, oldest first, each opening the reading pane.
-- **Leaders' own diaries:** under 我的日記, identical to 4.2. They also appear in the review lists like anyone's,
-  and the leader may comment on and approve them there.
-- **API:** `GET leader/calendar?month=` → `{date: count}`; `GET leader/documents?date=&page=&size=` and
-  `?user=&month=` → per entry `id, title, authorName, myCommentState, otherLeaderCommented, access`;
-  `GET leader/users?month=` → names + counts; `GET leader/open-requests`; `PUT comments/mine`;
-  `POST access approve|decline|revoke`.
+- **Filters** (beside the feed from 768 px, folded under a summary line on phones):
+  - **未讀 (n):** what this leader hasn't read since it was last submitted (read audit, last 90 days, never their
+    own); holds still while reading, pressing it again refreshes.
+  - **申請開放 (n):** share requests, oldest first; a decided one leaves the feed.
+  - **Calendar:** a day's entries (the default is today, so a leader sees them at once); 20 per page,
+    adjustable (spec §6.1).
+  - **學員:** search, monthly counts; a student's entries for the calendar's month.
+- **My comment:** a small 寫批注 until written; a saved draft opens in the editor (small toolbar, 暫存 /
+  提交批注); once submitted it reads like the others, with 編輯 (and 取消) to change it. Changing the filter
+  with an unsaved comment asks first.
+- **Leaders' own diaries:** under 我的日記, identical to 4.2. They also appear in 批閱 like anyone's, and the
+  leader may comment on and approve them there.
+- **API:** `GET leader/calendar?month=` → `{date: count}`; `GET leader/documents?date=&page=&size=`,
+  `?user=&month=` and `?unread=true&page=&size=` → per entry `id, title, author, myCommentState,
+  otherLeaderCommented, unread, access`; `GET leader/users?month=` → names + counts; `GET leader/open-requests`;
+  `GET documents/:id` per entry as it loads; `PUT comments/mine`; `POST access approve|decline|revoke`.
 
 ### 4.8 SYS_ADMIN (desktop first)
 
@@ -326,7 +346,7 @@ paid cloud features.
 
 | # | Question | Decision (all agreed 2026-10-14) |
 |---|---|---|
-| F1 | Tapping an own entry: open the editor directly (spec §6.1) or a read view with 編輯? | **Read view** first, because that's where comments and translations live, and it avoids accidental edits |
+| F1 | Tapping an own entry: open the editor directly (spec §6.1) or a read view with 編輯? | **Read view** first, because that's where comments and translations live, and it avoids accidental edits. Since 2026-10-15 the read view is the 我的日記 feed itself, with a small 編輯 on each entry |
 | F2 | List style: the spec's table with ✅/❌ and +/− expand, or cards with chips? | **Cards** on phones; leaders and admins keep tables on desktop. The values-only rule still holds |
 | F3 | Approving an open request: the spec's checkbox, or explicit 批准開放 / 婉拒 buttons? | **Buttons**, plus the confirm dialog on approve; the current state is shown as a chip |
 | F4 | Libraries in §10 | Approve TanStack Query and Tiptap |

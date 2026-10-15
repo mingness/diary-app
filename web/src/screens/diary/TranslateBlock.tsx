@@ -1,6 +1,7 @@
 /**
- * 翻譯 / Translate (spec §8): buttons in the submit style, with the result as plain text below them, never in
- * a text box; a new click replaces it. Greyed out when the server has no translation provider.
+ * 翻譯 / Translate (spec §8): two small buttons at the right, with the result as plain text below them, never
+ * in a text box; a new click replaces it. Greyed out (the reason in their tooltip) when the server has no
+ * translation provider; a note beside every pair would repeat down a whole feed.
  */
 import { useState } from 'react';
 import type { TranslateDirection } from '@diary/shared';
@@ -33,23 +34,26 @@ export function TranslateBlock({
     <div className={styles.block}>
       <div className={styles.buttons}>
         <Button
-          variant="primary"
+          small
+          variant="quiet"
           lang="zh-Hant"
+          title={available ? undefined : t('translate.off')}
           disabled={!available || translate.isPending}
           onClick={() => run('en_to_zh')}
         >
           {t('translate.toZh')}
         </Button>
         <Button
-          variant="primary"
+          small
+          variant="quiet"
           lang="en"
+          title={available ? undefined : t('translate.off')}
           disabled={!available || translate.isPending}
           onClick={() => run('zh_to_en')}
         >
           {t('translate.toEn')}
         </Button>
       </div>
-      {!available && <p className={styles.off}>{t('translate.off')}</p>}
       <div aria-live="polite">
         {translate.isPending && <p>{t('translate.working')}</p>}
         {result !== null && (

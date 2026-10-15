@@ -4,10 +4,13 @@
   gap: var(--space-2);
 }
 
+/* Off to the right and low-key: a tool for those who need it, not part of the reading (changed 2026-10-15). */
 .buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
 }
 
 .result {
@@ -22,9 +25,4 @@
   display: block;
   font-size: var(--text-sm);
   color: var(--muted);
-}
-
-.off {
-  color: var(--muted);
-  font-size: var(--text-sm);
 }

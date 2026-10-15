@@ -73,6 +73,39 @@
   box-shadow: inset 0 3px 0 var(--primary);
 }
 
+.icon {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+/* The global `svg { max-width: 100% }` would shrink the icon to its wrapper's (unknown) width. */
+.icon > svg {
+  max-width: none;
+}
+
+/* The open-requests count: number and colour, plus hidden words for screen readers. */
+.badge {
+  position: absolute;
+  top: -0.4rem;
+  right: -0.8rem;
+  min-width: 1.3rem;
+  height: 1.3rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--danger);
+  color: var(--surface);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.3rem;
+  text-align: center;
+}
+
+.wideLabel,
+.desktopOnly {
+  display: none;
+}
+
 /* Detail screens (editor, entry) replace the phone tab bar with their back button. */
 .navDetail {
   display: none;
@@ -120,6 +153,23 @@
   .tab[aria-current='page'] {
     background: var(--primary-soft);
     box-shadow: none;
+  }
+
+  .phoneLabel {
+    display: none;
+  }
+
+  .wideLabel {
+    display: inline;
+  }
+
+  .desktopOnly {
+    display: list-item;
+  }
+
+  /* Room for the badge beside the icon, clear of the label. */
+  .icon:has(.badge) {
+    margin-right: 0.6rem;
   }
 
   .main {

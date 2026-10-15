@@ -50,6 +50,13 @@
       "when": 1792029366780,
       "tag": "0006_count_latest",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792056991571,
+      "tag": "0007_read_audit_leader_index",
+      "breakpoints": true
     }
   ]
 }

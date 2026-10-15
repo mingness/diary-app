@@ -340,6 +340,8 @@ export const readAudit = pgTable(
   (t) => [
     index('read_audit_document_idx').on(t.documentId, t.readAt),
     index('read_audit_read_at_idx').on(t.readAt),
+    // The leaders' "not read yet" checks look up one leader's reads of one entry.
+    index('read_audit_leader_document_idx').on(t.leaderId, t.documentId, t.readAt),
   ],
 );
 

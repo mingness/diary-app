@@ -1,0 +1,30 @@
+.toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface);
+  flex: none;
+}
+
+.option {
+  min-height: var(--touch);
+  padding: 0 var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* The language in use: filled, bold and announced as pressed, so it's clear at a glance. */
+.option[aria-pressed='true'] {
+  background: var(--primary);
+  color: var(--on-primary);
+  font-weight: 700;
+  cursor: default;
+}
+
+.option:focus-visible {
+  outline-offset: -3px;
+}

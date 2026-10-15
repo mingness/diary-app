@@ -85,8 +85,9 @@ test('write, save a draft, submit, then update with the earlier version kept in 
   await history.getByRole('button', { name: t('common.close') }).click();
 
   await page.getByRole('button', { name: t('common.back') }).click();
-  const card = page.getByRole('link', { name: new RegExp(title) });
-  await expect(card).toContainText(t('chip.submitted'));
+  const item = page.getByRole('listitem').filter({ hasText: title });
+  await item.scrollIntoViewIfNeeded();
+  await expect(item).toContainText(t('chip.submitted'));
 });
 
 test('formatting survives saving and reopening exactly', async ({ userPage: page, t }) => {
@@ -197,52 +198,44 @@ test('sharing can be asked for once submitted, and withdrawn', async ({ userPage
   await expect(share).not.toBeChecked();
 });
 
-test('open diaries are readable by others, with their comments, and can’t be edited', async ({
+test('開放日記 is just for reading, and narrows by author and by day', async ({
   userPage: page,
   t,
   user,
 }) => {
-  await page.goto('/open');
-  // Someone else's entry: the owner of an open entry rightly gets their own view, with 編輯.
   const month = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Shanghai',
     year: 'numeric',
     month: '2-digit',
   }).format(new Date());
   const list = await (await page.request.get(`/api/documents/open?month=${month}`)).json();
-  const other = (list.documents as { id: string; author: { username: string } }[]).find(
-    (d) => d.author.username !== user,
-  );
+  type Row = {
+    id: string;
+    title: string;
+    diaryDate: string;
+    author: { id: string; username: string };
+  };
+  const rows = list.documents as Row[];
+  const other = rows.find((d) => d.author.username !== user);
   expect(other, 'the seed has an open entry by someone else this month').toBeTruthy();
-  await page.locator(`a[href="/open/${other!.id}"]`).click();
-  await expect(page).toHaveURL(/\/open\/[0-9a-f-]{36}$/);
-  await expect(page.getByRole('button', { name: t('translate.toEn') }).first()).toBeVisible();
+
+  await page.goto(`/open?user=${other!.author.id}`);
+  const articles = page.getByRole('article');
+  await expect(articles.first()).toBeVisible();
+  // Only that author's entries, read-only: no editing, sharing or comment counts.
+  // Their entries are there, and nobody else's (other projects may open more meanwhile, so no exact count).
+  const item = (title: string) => page.locator('ol > li').filter({ hasText: title });
+  await expect(item(other!.title)).toHaveCount(1);
+  const someoneElse = rows.find((d) => d.author.id !== other!.author.id);
+  if (someoneElse) await expect(item(someoneElse.title)).toHaveCount(0);
   await expect(page.getByRole('link', { name: t('entry.edit') })).toHaveCount(0);
-  await page.getByRole('button', { name: t('common.back') }).click();
-  await expect(page).toHaveURL(/\/open$/);
-});
+  await expect(page.getByRole('checkbox', { name: t('share.label') })).toHaveCount(0);
 
-test.describe('the seeded user with an unseen comment', () => {
-  test.skip(({ user }) => user !== 'chenmd');
-
-  test('a new comment is marked on the card until the entry is opened', async ({
-    userPage: page,
-    t,
-  }) => {
-    await page.goto('/diary');
-    const marked = page
-      .getByRole('link')
-      .filter({ hasText: t('chip.newComment') })
-      .first();
-    const title = (await marked.locator('span').first().textContent()) ?? '';
-    await marked.click();
-    await expect(page.getByText(t('entry.newComment'), { exact: true }).first()).toBeVisible();
-    await expect(page.getByRole('heading', { name: t('entry.commentLabel') })).toBeVisible();
-
-    await page.getByRole('button', { name: t('common.back') }).click();
-    const card = page.getByRole('link').filter({ hasText: title });
-    await expect(card).not.toContainText(t('chip.newComment'));
-  });
+  // A day on the calendar narrows further; choosing it again lets go.
+  await page.goto(`/open?date=${other!.diaryDate}`);
+  await expect(item(other!.title)).toHaveCount(1);
+  const otherDay = rows.find((d) => d.diaryDate !== other!.diaryDate);
+  if (otherDay) await expect(item(otherDay.title)).toHaveCount(0);
 });
 
 test('the diary screens pass axe in both themes and fit the phone at the largest text size', async ({
@@ -267,8 +260,59 @@ test('the diary screens pass axe in both themes and fit the phone at the largest
     );
     expect(overflow, path).toBeLessThanOrEqual(0);
   }
+  // The feeds with whole entries loaded.
+  for (const path of ['/diary', '/open']) {
+    await page.goto(path);
+    await expect(page.getByRole('article').first()).toBeVisible();
+    await expectNoAxeViolations(page);
+  }
+});
+
+test('開放日記 shows the month’s open entries in full, one after another', async ({
+  userPage: page,
+  t,
+}) => {
+  await page.goto('/open');
+  const articles = page.getByRole('article');
+  await expect(articles.first()).toBeVisible();
+  await expect(
+    articles
+      .first()
+      .getByRole('button', { name: t('translate.toEn') })
+      .first(),
+  ).toBeVisible();
+  await expect(page.getByText(t('reading.end'))).toBeAttached();
+});
+
+test('a new comment is marked 新 the first time the feed shows it, and not after', async ({
+  userPage: page,
+  leaderPage,
+  t,
+}) => {
+  // The student submits; the leader comments, both through the API.
+  const csrf = async (p: Page) =>
+    (await (await p.request.get('/api/me')).json()).csrfToken as string;
+  const title = uniqueTitle('Seen');
+  const body = '<p>今天念佛。</p>';
+  const mine = { 'x-csrf-token': await csrf(page) };
+  const { id } = await (
+    await page.request.post('/api/documents', { headers: mine, data: { title, body } })
+  ).json();
+  await page.request.post(`/api/documents/${id}/submit`, { headers: mine, data: { title, body } });
+  const comment = await leaderPage.request.put(`/api/documents/${id}/comments/mine`, {
+    headers: { 'x-csrf-token': await csrf(leaderPage) },
+    data: { body: '<p>Good.</p>', state: 'submitted' },
+  });
+  expect(comment.ok()).toBe(true);
+
   await page.goto('/diary');
-  await page.getByRole('main').getByRole('list').getByRole('link').first().click();
-  await expect(page.getByRole('button', { name: t('translate.toEn') }).first()).toBeVisible();
-  await expectNoAxeViolations(page);
+  const item = page.getByRole('listitem').filter({ hasText: title });
+  await item.scrollIntoViewIfNeeded();
+  await expect(item.getByText(t('entry.newComment'), { exact: true })).toBeVisible();
+
+  // Shown once, so seen: no longer new.
+  await page.reload();
+  await item.scrollIntoViewIfNeeded();
+  await expect(item.getByRole('article')).toBeVisible();
+  await expect(item.getByText(t('entry.newComment'), { exact: true })).toHaveCount(0);
 });

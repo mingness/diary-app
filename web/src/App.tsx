@@ -30,8 +30,6 @@ import { EnrolScreen } from './screens/auth/EnrolScreen.js';
 import { ForgotPasswordScreen } from './screens/auth/ForgotPasswordScreen.js';
 import { LoginScreen } from './screens/auth/LoginScreen.js';
 import { RegisterScreen } from './screens/auth/RegisterScreen.js';
-import { MyDiaryScreen } from './screens/diary/MyDiaryScreen.js';
-import { OpenDiaryScreen } from './screens/diary/OpenDiaryScreen.js';
 
 /** Waits for the session; a failed check (not "signed out", which is a valid answer) offers a retry. */
 function SessionGate({ children }: { children: (session: Session) => ReactNode }) {
@@ -88,43 +86,53 @@ function ForRoles({ roles }: { roles: readonly Role[] }) {
   return roles.includes(me.role) ? <Outlet /> : <NotFound />;
 }
 
-/** Until 報數 (slice 16) and the leader and admin homes (slices 14–15) exist, land somewhere real. */
+/** Until 報數 (slice 16) and the admin home (slice 15) exist, land on each role's home. */
 function NotYetBuilt() {
   const me = useMe();
-  return <Navigate to={me.role === 'SYS_ADMIN' ? '/me' : '/diary'} replace />;
+  const home = { NORMAL_USER: '/diary', COURSE_LEADER: '/review', SYS_ADMIN: '/me' } as const;
+  return <Navigate to={home[me.role]} replace />;
 }
 
 const WRITERS: readonly Role[] = ['NORMAL_USER', 'COURSE_LEADER'];
+const LEADERS: readonly Role[] = ['COURSE_LEADER'];
 
 /** Detail screens hide the phone tab bar and show a back button instead (FRONTEND.md §3). */
 const detail = { handle: { detail: true } };
+/** Screens with several panes use the full width on large screens. */
+const wide = { handle: { wide: true } };
 
+// Every diary screen shows or edits entries with Tiptap, so they load on first use and sign-in stays light.
 const diaryRoutes: RouteObject[] = [
-  { path: '/diary', element: <MyDiaryScreen /> },
-  { path: '/open', element: <OpenDiaryScreen /> },
   {
-    // The Tiptap screens load on first use, so sign-in and the lists stay light.
+    path: '/diary',
+    lazy: async () => ({
+      Component: (await import('./screens/diary/MyDiaryScreen.js')).MyDiaryScreen,
+    }),
+  },
+  {
+    path: '/open',
+    ...wide,
+    lazy: async () => ({
+      Component: (await import('./screens/diary/OpenDiaryScreen.js')).OpenDiaryScreen,
+    }),
+  },
+  {
     path: '/diary/:id/edit',
     ...detail,
     lazy: async () => ({
       Component: (await import('./screens/diary/EditorScreen.js')).EditorScreen,
     }),
   },
+];
+
+// 批閱 shows entries and comment editors with Tiptap, so it loads on first use too.
+const reviewRoutes: RouteObject[] = [
   {
-    path: '/diary/:id',
-    ...detail,
-    lazy: async () => {
-      const { EntryScreen } = await import('./screens/diary/EntryScreen.js');
-      return { Component: () => <EntryScreen fallback="/diary" /> };
-    },
-  },
-  {
-    path: '/open/:id',
-    ...detail,
-    lazy: async () => {
-      const { EntryScreen } = await import('./screens/diary/EntryScreen.js');
-      return { Component: () => <EntryScreen fallback="/open" /> };
-    },
+    path: '/review',
+    ...wide,
+    lazy: async () => ({
+      Component: (await import('./screens/review/ReviewScreen.js')).ReviewScreen,
+    }),
   },
 ];
 
@@ -186,8 +194,9 @@ const router = createBrowserRouter([
           { index: true, element: <Home /> },
           { path: '/me', element: <AccountScreen /> },
           { element: <ForRoles roles={WRITERS} />, children: diaryRoutes },
+          { element: <ForRoles roles={LEADERS} />, children: reviewRoutes },
           // Landing destinations whose screens arrive in later slices (ARCHITECTURE §11).
-          ...['/count', '/review', '/admin'].map((path) => ({ path, element: <NotYetBuilt /> })),
+          ...['/count', '/admin'].map((path) => ({ path, element: <NotYetBuilt /> })),
           { path: '*', element: <NotFound /> },
         ],
       },

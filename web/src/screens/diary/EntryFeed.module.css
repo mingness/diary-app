@@ -1,0 +1,31 @@
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Each entry is a card of its own, so where one ends and the next begins is plain. */
+.item {
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  scroll-margin-top: 5rem;
+}
+
+.placeholder {
+  min-height: 12rem;
+}
+
+.placeholderTitle {
+  font-family: var(--font-serif);
+  font-size: var(--text-title);
+}
+
+.end {
+  text-align: center;
+  color: var(--muted);
+}

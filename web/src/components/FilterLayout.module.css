@@ -1,0 +1,73 @@
+.layout {
+  display: grid;
+  gap: var(--space-4);
+  align-items: start;
+  grid-template-areas: 'heading' 'filters' 'feed';
+}
+
+.heading {
+  grid-area: heading;
+}
+
+.side,
+.fold {
+  grid-area: filters;
+}
+
+.feed {
+  grid-area: feed;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+@media (min-width: 768px) {
+  .layout {
+    grid-template-columns: 17rem minmax(0, 1fr);
+    grid-template-areas: 'heading heading' 'filters feed';
+  }
+
+  .side {
+    position: sticky;
+    top: 5rem;
+    max-height: calc(100dvh - 6rem);
+    overflow-y: auto;
+  }
+}
+
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Phones: the filters fold away under one line saying what is shown. */
+.fold {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 0 var(--space-3);
+}
+
+.fold summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  min-height: var(--touch);
+  cursor: pointer;
+}
+
+.fold[open] summary {
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-3);
+}
+
+.fold[open] .filters {
+  padding-bottom: var(--space-3);
+}
+
+.foldLabel {
+  font-weight: 700;
+}

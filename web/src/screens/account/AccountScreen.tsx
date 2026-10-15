@@ -49,6 +49,8 @@ export function AccountScreen() {
   );
 }
 
+const APPEARANCE = ['appearance'] as const;
+
 function AppearanceSection() {
   const t = useT();
   const me = useMe();
@@ -59,9 +61,18 @@ function AppearanceSection() {
   const [picked, setPicked] = useState<Partial<Appearance>>({});
 
   const save = useMutation({
+    mutationKey: APPEARANCE,
+    // One save at a time, in order: two quick changes must not race, or the first reply (with the old theme)
+    // could land last and undo the second.
+    scope: { id: 'appearance' },
     mutationFn: ({ change }: { change: Partial<Appearance>; previous: Session }) =>
       api<MeResponse>('PUT', '/api/me', change),
-    onSuccess: (response) => queryClient.setQueryData(SESSION_KEY, sessionFromMe(response)),
+    // Only the last queued save's reply has every change in it; earlier ones would briefly undo later picks.
+    onSuccess: (response) => {
+      if (queryClient.isMutating({ mutationKey: APPEARANCE }) <= 1) {
+        queryClient.setQueryData(SESSION_KEY, sessionFromMe(response));
+      }
+    },
     onError: (error, { previous }) => {
       queryClient.setQueryData(SESSION_KEY, previous);
       toast.showError(error);

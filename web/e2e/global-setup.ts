@@ -69,7 +69,9 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   writeFileSync(new URL('seed.json', AUTH_DIR), JSON.stringify({ totpKeys: reseed(databaseUrl) }));
 
   const users = new Set(
-    config.projects.map((p) => (p.use as { user?: string }).user).filter(Boolean),
+    config.projects
+      .flatMap((p) => [(p.use as { user?: string }).user, (p.use as { leader?: string }).leader])
+      .filter(Boolean),
   );
   for (const user of users) await saveSession(baseURL, user!);
   step('ready');

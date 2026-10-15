@@ -7,10 +7,9 @@
  * address changes from /diary/new/edit to the entry's own, without remounting the editor.
  */
 import { useEffect, useRef, useState } from 'react';
-import type { ChangeEvent } from 'react';
 import { useBlocker, useNavigate, useParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react';
+import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import { Placeholder, UndoRedo } from '@tiptap/extensions';
 import type { Node as PmNode } from '@tiptap/pm/model';
 import {
@@ -33,24 +32,15 @@ import { DetailHeader } from '../../components/DetailHeader.js';
 import { ConfirmDialog } from '../../components/Dialog.js';
 import { TextField } from '../../components/Field.js';
 import { Icon } from '../../components/Icon.js';
-import { Notice, type NoticeKind } from '../../components/Notice.js';
+import { Notice } from '../../components/Notice.js';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States.js';
 import { useToast } from '../../components/Toast.js';
 import { useI18n } from '../../i18n/index.js';
 import { beijingDate, formatDiaryDate, formatTime } from '../../lib/dates.js';
-import { formatBytes, PhotoError, preparePhoto } from '../../lib/images.js';
+import { readToolbarState, Toolbar, usePhotoInsert, type EditorMessage } from './editorParts.js';
 import { HistorySheet } from './HistorySheet.js';
 import { counterTone, editorButtons } from './rules.js';
-import {
-  contentExtensions,
-  countImages,
-  FONTS,
-  fontKeyOf,
-  SIZES,
-  sizeKeyOf,
-  type FontKey,
-  type SizeKey,
-} from './schema.js';
+import { contentExtensions, countImages } from './schema.js';
 import { ShareToggle } from './ShareToggle.js';
 import contentStyles from './content.module.css';
 import styles from './EditorScreen.module.css';
@@ -99,11 +89,7 @@ type SaveStatus =
   | { kind: 'offline' }
   | { kind: 'failed' };
 
-interface Message {
-  kind: NoticeKind;
-  text: string;
-  requestId?: string | null;
-}
+type Message = EditorMessage;
 
 function serverStateOf(entry: OwnerEntry | null): ServerState {
   return {
@@ -130,7 +116,6 @@ function EntryEditor({ initial }: { initial: OwnerEntry | null }) {
     submitted: initial ? !initial.draft && initial.submitted !== null : false,
   }));
   const [message, setMessage] = useState<Message | null>(null);
-  const [photoBusy, setPhotoBusy] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
   // What was last saved, to tell whether there are unsaved changes. Comparing documents (not HTML) is cheap
@@ -140,7 +125,6 @@ function EntryEditor({ initial }: { initial: OwnerEntry | null }) {
   const busy = useRef(false);
   /** The address the first save moves to, which the leave guard must let through. */
   const ownAddress = useRef<string | null>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
 
   const editor = useEditor({
     extensions: [
@@ -165,26 +149,13 @@ function EntryEditor({ initial }: { initial: OwnerEntry | null }) {
 
   const view = useEditorState({
     editor,
-    selector: ({ editor: e }) => {
-      if (!e) return null;
-      const style = e.getAttributes('textStyle') as { fontFamily?: string; fontSize?: string };
-      return {
+    selector: ({ editor: e }) =>
+      e && {
         bodyChanged: savedDoc.current !== null && !e.state.doc.eq(savedDoc.current),
         chars: visibleCharCount(e.state.doc.textContent),
         images: countImages(e.state.doc),
-        bold: e.isActive('bold'),
-        underline: e.isActive('underline'),
-        block: e.isActive('heading', { level: 1 })
-          ? 'h1'
-          : e.isActive('heading', { level: 2 })
-            ? 'h2'
-            : e.isActive('heading', { level: 3 })
-              ? 'h3'
-              : 'p',
-        font: (fontKeyOf(style.fontFamily) ?? 'default') as FontKey | 'default',
-        size: sizeKeyOf(style.fontSize),
-      };
-    },
+        ...readToolbarState(e),
+      },
   });
 
   // Sharing changes go straight to the server (ShareToggle) and land in the cached entry.
@@ -321,45 +292,7 @@ function EntryEditor({ initial }: { initial: OwnerEntry | null }) {
       nextLocation.pathname !== ownAddress.current,
   );
 
-  async function addPhoto(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file || !editor) return;
-    setPhotoBusy(true);
-    setMessage({ kind: 'info', text: t('editor.imageWorking') });
-    try {
-      const photo = await preparePhoto(file);
-      // After the selection: right after inserting, the previous photo is selected and would be replaced.
-      editor
-        .chain()
-        .focus()
-        .insertContentAt(editor.state.selection.to, {
-          type: 'image',
-          attrs: { src: photo.dataUrl, alt: '' },
-        })
-        .run();
-      const shrunk =
-        photo.result.width !== photo.original.width || photo.result.bytes < photo.original.bytes;
-      setMessage({
-        kind: 'info',
-        text: shrunk
-          ? t('editor.imageShrunk', {
-              from: `${photo.original.width}×${photo.original.height} (${formatBytes(photo.original.bytes)})`,
-              to: `${photo.result.width}×${photo.result.height} (${formatBytes(photo.result.bytes)})`,
-            })
-          : t('editor.imageStripped'),
-      });
-    } catch (error) {
-      const tooLarge = error instanceof PhotoError && error.reason === 'tooLarge';
-      setMessage({
-        kind: 'warning',
-        text: t(tooLarge ? 'editor.imageTooLarge' : 'editor.imageUnreadable'),
-      });
-    } finally {
-      setPhotoBusy(false);
-    }
-  }
-
+  const photo = usePhotoInsert(editor, setMessage);
   const tone = counterTone(chars);
   const imagesFull = (view?.images ?? 0) >= ENTRY_LIMITS.images;
 
@@ -388,17 +321,11 @@ function EntryEditor({ initial }: { initial: OwnerEntry | null }) {
           editor={editor}
           state={view}
           imagesFull={imagesFull}
-          photoBusy={photoBusy}
-          onPhoto={() => fileInput.current?.click()}
+          photoBusy={photo.busy}
+          onPhoto={photo.choose}
         />
       )}
-      <input
-        ref={fileInput}
-        type="file"
-        accept="image/*"
-        hidden
-        onChange={(e) => void addPhoto(e)}
-      />
+      {photo.input}
       {imagesFull && <p className={styles.help}>{t('editor.imageLimit')}</p>}
 
       <EditorContent editor={editor} className={`${contentStyles.content} ${styles.editor}`} />
@@ -512,114 +439,5 @@ function StatusText({ status, dirty }: { status: SaveStatus; dirty: boolean }) {
     <span className={styles.status} role="status">
       {text}
     </span>
-  );
-}
-
-interface ToolbarState {
-  bold: boolean;
-  underline: boolean;
-  block: string;
-  font: FontKey | 'default';
-  size: SizeKey;
-}
-
-function Toolbar({
-  editor,
-  state,
-  imagesFull,
-  photoBusy,
-  onPhoto,
-}: {
-  editor: Editor;
-  state: ToolbarState;
-  imagesFull: boolean;
-  photoBusy: boolean;
-  onPhoto: () => void;
-}) {
-  const { t } = useI18n();
-  const chain = () => editor.chain().focus();
-  // Buttons that don't take focus on press, so the caret stays in the text and typing carries on at once.
-  const keepEditorFocus = (event: { preventDefault: () => void }) => event.preventDefault();
-
-  return (
-    <div className={styles.toolbar} role="toolbar" aria-label={t('editor.toolbar')}>
-      <span className={styles.tool}>
-        <select
-          aria-label={t('editor.font')}
-          value={state.font}
-          onChange={(e) => {
-            const key = e.target.value as FontKey | 'default';
-            if (key === 'default') chain().unsetFontFamily().run();
-            else chain().setFontFamily(FONTS[key]).run();
-          }}
-        >
-          <option value="default">
-            {t('editor.font')}：{t('editor.fontDefault')}
-          </option>
-          <option value="serif">{t('editor.fontSerif')}</option>
-          <option value="sans">{t('editor.fontSans')}</option>
-          <option value="kai">{t('editor.fontKai')}</option>
-        </select>
-      </span>
-      <span className={styles.tool}>
-        <select
-          aria-label={t('editor.style')}
-          value={state.block}
-          onChange={(e) => {
-            const value = e.target.value;
-            if (value === 'p') chain().setParagraph().run();
-            else
-              chain()
-                .setHeading({ level: Number(value.slice(1)) as 1 | 2 | 3 })
-                .run();
-          }}
-        >
-          <option value="p">{t('editor.styleP')}</option>
-          <option value="h1">{t('editor.styleH1')}</option>
-          <option value="h2">{t('editor.styleH2')}</option>
-          <option value="h3">{t('editor.styleH3')}</option>
-        </select>
-      </span>
-      <span className={styles.tool}>
-        <select
-          aria-label={t('editor.size')}
-          value={state.size}
-          onChange={(e) => {
-            const key = e.target.value as SizeKey;
-            if (key === 'normal') chain().unsetFontSize().run();
-            else chain().setFontSize(SIZES[key]).run();
-          }}
-        >
-          <option value="small">{t('editor.sizeSmall')}</option>
-          <option value="normal">
-            {t('editor.size')}：{t('editor.sizeNormal')}
-          </option>
-          <option value="large">{t('editor.sizeLarge')}</option>
-          <option value="xlarge">{t('editor.sizeXLarge')}</option>
-        </select>
-      </span>
-      <Button
-        variant={state.bold ? 'secondary' : 'quiet'}
-        aria-pressed={state.bold}
-        aria-label={t('editor.bold')}
-        onMouseDown={keepEditorFocus}
-        onClick={() => chain().toggleBold().run()}
-      >
-        <b aria-hidden="true">B</b>
-      </Button>
-      <Button
-        variant={state.underline ? 'secondary' : 'quiet'}
-        aria-pressed={state.underline}
-        aria-label={t('editor.underline')}
-        onMouseDown={keepEditorFocus}
-        onClick={() => chain().toggleUnderline().run()}
-      >
-        <u aria-hidden="true">U</u>
-      </Button>
-      <Button variant="quiet" disabled={imagesFull || photoBusy} onClick={onPhoto}>
-        <Icon name="image" />
-        {t('editor.image')}
-      </Button>
-    </div>
   );
 }

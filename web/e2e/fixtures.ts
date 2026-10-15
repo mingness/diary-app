@@ -3,7 +3,7 @@
  * the words a user sees in either language), and sign-in helpers.
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { test as base, expect, type Page } from '@playwright/test';
+import { test as base, expect, type Browser, type Page } from '@playwright/test';
 import { en } from '../src/i18n/en.js';
 import { format, type Lang, type MessageKey, type Vars } from '../src/i18n/messages.js';
 import { zhHant } from '../src/i18n/zh-Hant.js';
@@ -14,6 +14,8 @@ export interface E2eOptions {
   lang: Lang;
   /** The seeded user this project signs in as (all seeded passwords are SEED_PASSWORD). */
   user: string;
+  /** The seeded course leader this project signs in as. */
+  leader: string;
 }
 
 export const SEED_PASSWORD = 'password123';
@@ -36,11 +38,14 @@ interface Fixtures {
   t: (key: MessageKey, vars?: Vars) => string;
   /** A page already signed in as the project's user. */
   userPage: Page;
+  /** A page already signed in as the project's course leader. */
+  leaderPage: Page;
 }
 
 export const test = base.extend<E2eOptions & Fixtures>({
   lang: ['zh-Hant', { option: true }],
   user: ['chenmd', { option: true }],
+  leader: ['leader.lin', { option: true }],
 
   page: async ({ page, lang }, use) => {
     // The project's language unless the test has switched it (the toggle writes the same key).
@@ -56,15 +61,26 @@ export const test = base.extend<E2eOptions & Fixtures>({
   },
 
   userPage: async ({ browser, lang, user }, use) => {
-    const context = await browser.newContext({ storageState: storageStateFor(user) });
-    await context.addInitScript((value) => {
-      if (!localStorage.getItem('diary.lang')) localStorage.setItem('diary.lang', value);
-    }, lang);
-    const page = await context.newPage();
+    const page = await signedInPage(browser, lang, user);
     await use(page);
-    await context.close();
+    await page.context().close();
+  },
+
+  leaderPage: async ({ browser, lang, leader }, use) => {
+    const page = await signedInPage(browser, lang, leader);
+    await use(page);
+    await page.context().close();
   },
 });
+
+/** A new browser context with a session saved by global setup, in the project's language. */
+async function signedInPage(browser: Browser, lang: Lang, username: string): Promise<Page> {
+  const context = await browser.newContext({ storageState: storageStateFor(username) });
+  await context.addInitScript((value) => {
+    if (!localStorage.getItem('diary.lang')) localStorage.setItem('diary.lang', value);
+  }, lang);
+  return context.newPage();
+}
 
 /** Fills the sign-in form (CAPTCHA included) and submits it. */
 export async function signIn(

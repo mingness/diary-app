@@ -32,8 +32,9 @@ export const diaryKeys = {
   versions: (id: string) => ['documents', 'versions', id] as const,
 };
 
-export function useMyDocuments(month: string) {
+export function useMyDocuments(month: string, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: diaryKeys.mine(month),
     queryFn: () => api<z.infer<typeof MyDocumentList>>('GET', `/api/documents/mine?month=${month}`),
     // Only while the list is mounted; TanStack Query also pauses it while the tab is hidden.
@@ -41,8 +42,9 @@ export function useMyDocuments(month: string) {
   });
 }
 
-export function useOpenDocuments(month: string) {
+export function useOpenDocuments(month: string, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: diaryKeys.open(month),
     queryFn: () =>
       api<z.infer<typeof OpenDocumentList>>('GET', `/api/documents/open?month=${month}`),
@@ -101,6 +103,7 @@ export function useAccessChange(id: string) {
         old && 'access' in old ? { ...old, access } : old,
       );
       void queryClient.invalidateQueries({ queryKey: diaryKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ['leader'] });
     },
   });
 }

@@ -17,6 +17,7 @@ import {
   documentsOfUser,
   documentsOnDate,
   openRequests,
+  unreadDocuments,
   usersWithMonthCounts,
 } from '../services/leader.js';
 
@@ -33,8 +34,10 @@ export function leaderRoutes(app: FastifyInstance, ctx: AppContext): void {
       schema: {
         tags: TAG,
         summary:
-          "Every submitted entry, mine included: ?date= for everyone's on a Beijing date, paged; or ?user=&month= " +
-          "for one user's month. Each row says my comment state and whether another leader has commented.",
+          "Every submitted entry, mine included: ?date= for everyone's on a Beijing date, paged; ?user=&month= " +
+          "for one user's month; or ?unread=true for what I haven't read since it was last submitted (last 90 " +
+          'days, not my own), paged. Each row says my comment state, whether another leader has commented, and ' +
+          'whether I have read it.',
         querystring: LeaderDocumentsQuery,
         response: { 200: LeaderDocumentList },
       },
@@ -42,6 +45,7 @@ export function leaderRoutes(app: FastifyInstance, ctx: AppContext): void {
     async (request) => {
       const { id } = authOf(request).user;
       const q = request.query;
+      if (q.unread) return unreadDocuments(ctx, id, q.page, q.size);
       return q.date
         ? documentsOnDate(ctx, id, q.date, q.page, q.size)
         : documentsOfUser(ctx, id, q.user ?? '', q.month ?? '');

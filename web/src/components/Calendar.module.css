@@ -1,0 +1,80 @@
+.calendar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.month {
+  font-weight: 700;
+  font-size: var(--text-lg);
+  white-space: nowrap;
+}
+
+.grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.grid th {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  font-weight: 600;
+  padding-bottom: var(--space-1);
+}
+
+.grid td {
+  padding: 1px;
+  text-align: center;
+}
+
+.day {
+  position: relative;
+  width: 100%;
+  min-height: var(--touch);
+  border: 2px solid transparent;
+  border-radius: var(--radius-input);
+  background: transparent;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.day:hover {
+  background: var(--surface-2);
+}
+
+/* Today is ringed (spec §6.3); the chosen day is filled. */
+.today {
+  border-color: var(--primary);
+}
+
+.selected {
+  background: var(--primary);
+  color: var(--on-primary);
+  font-weight: 700;
+}
+
+.selected:hover {
+  background: var(--primary);
+}
+
+.dot {
+  position: absolute;
+  left: 50%;
+  bottom: 0.2rem;
+  width: 0.35rem;
+  height: 0.35rem;
+  margin-left: -0.175rem;
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+.selected .dot {
+  background: var(--on-primary);
+}

@@ -1,20 +1,29 @@
-import { useI18n } from '../i18n/index.js';
-import { Button } from './Button.js';
-import { Icon } from './Icon.js';
+/**
+ * The language switch, top right on every screen (spec §10.1). Both languages show, with the one in use
+ * highlighted, so it's clear which is active even when the content itself is all Chinese (changed
+ * 2026-10-15; it used to show only the other language's name).
+ */
+import { useI18n, type Lang } from '../i18n/index.js';
+import styles from './LanguageToggle.module.css';
 
-/** One toggle, top right on every screen, showing the other language's name (spec §10.1). */
+const NAMES: Record<Lang, string> = { 'zh-Hant': '中文', en: 'English' };
+
 export function LanguageToggle() {
   const { lang, setLang, t } = useI18n();
-  const other = lang === 'en' ? 'zh-Hant' : 'en';
   return (
-    <Button
-      variant="quiet"
-      lang={other}
-      aria-label={t('lang.switch')}
-      onClick={() => setLang(other)}
-    >
-      <Icon name="globe" />
-      {t('lang.other')}
-    </Button>
+    <div className={styles.toggle} role="group" aria-label={t('lang.label')}>
+      {(Object.keys(NAMES) as Lang[]).map((option) => (
+        <button
+          key={option}
+          type="button"
+          lang={option}
+          className={styles.option}
+          aria-pressed={option === lang}
+          onClick={() => setLang(option)}
+        >
+          {NAMES[option]}
+        </button>
+      ))}
+    </div>
   );
 }

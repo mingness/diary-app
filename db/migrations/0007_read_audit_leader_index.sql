@@ -1,0 +1,1 @@
+CREATE INDEX "read_audit_leader_document_idx" ON "read_audit" USING btree ("leader_id","document_id","read_at");

@@ -13,10 +13,9 @@ export function CommentList({ comments }: { comments: readonly Comment[] }) {
   const { t, lang } = useI18n();
   if (comments.length === 0) return null;
   return (
-    <section aria-labelledby="comments-label">
-      <h2 id="comments-label" className={styles.label}>
-        {t('entry.commentLabel')}
-      </h2>
+    // A plain block, not a landmark: a feed has many entries, each with its own comments.
+    <div>
+      <h2 className={styles.label}>{t('entry.commentLabel')}</h2>
       <ul className={styles.list}>
         {comments.map((comment) => (
           <li key={comment.id} className={styles.card}>
@@ -38,6 +37,6 @@ export function CommentList({ comments }: { comments: readonly Comment[] }) {
           </li>
         ))}
       </ul>
-    </section>
+    </div>
   );
 }

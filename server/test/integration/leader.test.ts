@@ -446,3 +446,69 @@ describe('read audit retention', () => {
     expect(left).toHaveLength(1);
   });
 });
+
+describe('new for me: entries a leader hasn’t read yet (FRONTEND.md §4.7)', () => {
+  const unread = async (who: Who) =>
+    LeaderDocumentList.parse(
+      (await call(who, 'GET', '/api/leader/documents?unread=true&size=100')).json(),
+    ).documents.map((d) => d.id);
+
+  it('lists what I haven’t opened since it was last submitted, for me alone, and again after an update', async () => {
+    const owner = await person();
+    const [me, other] = [await person('COURSE_LEADER'), await person('COURSE_LEADER')];
+    const older = await entry(owner, 'older', '<p>a</p>');
+    t.clock.advance(60_000);
+    const newer = await entry(owner, 'newer', '<p>b</p>');
+    const draft = await entry(owner, 'draft', '<p>c</p>', false);
+
+    // Newest first; never-submitted entries aren't reviewable at all.
+    const before = await unread(me);
+    expect(before.indexOf(newer)).toBeLessThan(before.indexOf(older));
+    expect(before).not.toContain(draft);
+
+    await leaderView(me, older);
+    expect(await unread(me)).not.toContain(older);
+    expect(await unread(other)).toContain(older);
+
+    t.clock.advance(60_000);
+    await call(owner, 'POST', `/api/documents/${older}/submit`, {
+      title: 'older',
+      body: '<p>a2</p>',
+    });
+    expect(await unread(me)).toContain(older);
+  });
+
+  it('never counts a leader’s own entries, and marks rows in the other lists too', async () => {
+    const [me, owner] = [await person('COURSE_LEADER'), await person()];
+    const mine = await entry(me, 'mine', '<p>m</p>');
+    const theirs = await entry(owner, 'theirs', '<p>t</p>');
+    expect(await unread(me)).not.toContain(mine);
+
+    const today = (await ownerView(owner, theirs)).diaryDate;
+    const day = async () =>
+      LeaderDocumentList.parse(
+        (await call(me, 'GET', `/api/leader/documents?date=${today}&size=100`)).json(),
+      ).documents;
+    const flag = async (id: string) => (await day()).find((d) => d.id === id)?.unread;
+    expect(await flag(mine)).toBe(false);
+    expect(await flag(theirs)).toBe(true);
+    await leaderView(me, theirs);
+    expect(await flag(theirs)).toBe(false);
+  });
+
+  it('leaves out entries older than the read record, which is kept 90 days', async () => {
+    const owner = await person();
+    const old = await entry(owner, 'old', '<p>o</p>');
+    t.clock.advance(91 * DAY);
+    // Sessions have expired meanwhile; a fresh leader signs in.
+    const me = await person('COURSE_LEADER');
+    expect(await unread(me)).not.toContain(old);
+  });
+
+  it('takes exactly one way of choosing the list', async () => {
+    const me = await person('COURSE_LEADER');
+    const res = await call(me, 'GET', '/api/leader/documents?unread=true&date=2026-10-01');
+    expect(res.statusCode).toBe(400);
+    expect(code(res)).toBe('validation_failed');
+  });
+});

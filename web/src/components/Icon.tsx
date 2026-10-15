@@ -22,6 +22,9 @@ const PATHS = {
   bookOpen: 'M12 6c-2-1.5-5-2-8-2v14c3 0 6 .5 8 2 2-1.5 5-2 8-2V4c-3 0-6 .5-8 2Zm0 0v14',
   image: 'M4 5h16v14H4V5Zm0 10 4-4 4 4 3-3 5 5M15 9h.01',
   history: 'M3 12a9 9 0 1 0 3-6.7M3 4v4h4M12 7v5l3 2',
+  review: 'M9 4h6v3H9V4Zm-3 1H5v16h14V5h-1M8 13l3 3 5-6',
+  forward: 'M9 5l7 7-7 7',
+  inbox: 'M3 13h5l1 3h6l1-3h5M5 5h14l2 8v6H3v-6l2-8Z',
 } as const;
 
 export type IconName = keyof typeof PATHS;

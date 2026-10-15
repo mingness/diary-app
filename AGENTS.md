@@ -111,7 +111,8 @@ Keep this file up to date when commands, conventions or pitfalls change.
   ID. Styles are CSS modules using the tokens in `web/src/styles/tokens.css`, sized in rem. A new screen gets
   an axe check in both themes in `web/e2e/` and works at 360 px and 22 px text.
 - **E2E tests** read strings from the app's own tables via the `t` fixture, so one test covers both
-  languages. The stack's per-IP limits are real: sign in through the saved sessions (`userPage`) rather than
+  languages. Each project has a seeded user (`userPage`) and a course leader (`leaderPage`); two projects
+  share each leader, so a leader test works on an entry its own student just created through the API. The stack's per-IP limits are real: sign in through the saved sessions (`userPage`) rather than
   the form where the form isn't the point, and run register/forgot-password/admin flows in one project.
 - **Comments** explain why, not what. Public functions get a doc comment.
 - **Commits:** Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`).

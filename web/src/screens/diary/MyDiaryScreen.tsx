@@ -1,6 +1,7 @@
 /**
- * 我的日記 (FRONTEND.md §4.2): the write button, the month, and this month's entries as cards. While it's on
- * screen it checks every 30 s for new comments and entries (from another device) and says so with a toast.
+ * 我的日記 (FRONTEND.md §4.2): the write button, the month, and the month's entries in full, one after another
+ * (each with 編輯 and its sharing request), so reading back takes no clicks. While it's on screen it checks
+ * every 30 s for new comments and entries (from another device) and says so with a toast.
  */
 import { useEffect, useRef } from 'react';
 import { Link } from 'react-router';
@@ -11,8 +12,7 @@ import { MonthNav } from '../../components/MonthNav.js';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States.js';
 import { useToast } from '../../components/Toast.js';
 import { useI18n } from '../../i18n/index.js';
-import { formatDiaryDate } from '../../lib/dates.js';
-import { AccessChip, CommentChip, StateChip } from './chips.js';
+import { EntryFeed } from './EntryFeed.js';
 import { useMonthParam } from './useMonth.js';
 import styles from './lists.module.css';
 
@@ -29,7 +29,7 @@ export function newsBetween(
 }
 
 export function MyDiaryScreen() {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const toast = useToast();
   const [month, setMonth] = useMonthParam();
   const query = useMyDocuments(month);
@@ -50,7 +50,7 @@ export function MyDiaryScreen() {
   return (
     <div className={styles.page}>
       <h1>{t('diary.title')}</h1>
-      <Link to="/diary/new/edit" className={buttonClass('primary', true)}>
+      <Link to="/diary/new/edit" className={buttonClass('primary', { wide: true })}>
         <Icon name="pen" />
         {t('diary.write')}
       </Link>
@@ -62,21 +62,7 @@ export function MyDiaryScreen() {
       ) : query.data.documents.length === 0 ? (
         <EmptyState title={t('diary.empty')} />
       ) : (
-        <ul className={styles.list}>
-          {query.data.documents.map((row) => (
-            <li key={row.id}>
-              <Link to={`/diary/${row.id}`} className={styles.card}>
-                <span className={styles.cardTitle}>{row.title || t('entry.untitled')}</span>
-                <span className={styles.meta}>{formatDiaryDate(row.diaryDate, lang)}</span>
-                <span className={styles.chips}>
-                  <StateChip state={row.state} />
-                  <AccessChip access={row.access} />
-                  <CommentChip count={row.commentCount} unseen={row.hasUnseenComment} />
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <EntryFeed rows={query.data.documents} context="own" level={2} />
       )}
     </div>
   );

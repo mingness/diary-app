@@ -102,3 +102,30 @@ export function formatDateTime(iso: string, lang: Lang): string {
   const { month, day } = parts(d, zone, lang);
   return `${month}月${day}日 ${formatTime(iso, lang)}`;
 }
+
+/**
+ * The days of a month as weeks starting on Sunday, with null for the blanks before the 1st and after the last
+ * day: what a calendar grid shows.
+ */
+export function monthGrid(month: string): (string | null)[][] {
+  const [year, mon] = month.split('-').map(Number) as [number, number];
+  const first = new Date(Date.UTC(year, mon - 1, 1)).getUTCDay();
+  const days = new Date(Date.UTC(year, mon, 0)).getUTCDate();
+  const cells: (string | null)[] = Array.from({ length: first }, () => null);
+  for (let day = 1; day <= days; day++) cells.push(`${month}-${String(day).padStart(2, '0')}`);
+  while (cells.length % 7 !== 0) cells.push(null);
+  const weeks: (string | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
+}
+
+/** Weekday headers from Sunday: 日 一 二 … / Sun Mon Tue … (spec §6.3: Chinese weekday headers). */
+export function weekdayNames(lang: Lang): string[] {
+  // 2023-01-01 was a Sunday.
+  return Array.from({ length: 7 }, (_, i) =>
+    new Intl.DateTimeFormat(LOCALE[lang], {
+      timeZone: 'UTC',
+      weekday: lang === 'en' ? 'short' : 'narrow',
+    }).format(new Date(Date.UTC(2023, 0, 1 + i))),
+  );
+}

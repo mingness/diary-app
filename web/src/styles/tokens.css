@@ -23,8 +23,13 @@
   --focus: #2f5d8c;
   color-scheme: light;
 
-  --font-ui: 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', system-ui, sans-serif;
-  --font-serif: 'Songti TC', 'Noto Serif TC', 'PMingLiU', serif;
+  /* Traditional Chinese system fonts (no web fonts: FRONTEND.md §2.2). Linux names its Noto fonts "CJK". */
+  --font-cjk-sans:
+    'PingFang TC', 'Noto Sans TC', 'Noto Sans CJK TC', 'Noto Sans CJK HK', 'Microsoft JhengHei';
+  --font-cjk-serif:
+    'Songti TC', 'Noto Serif TC', 'Noto Serif CJK TC', 'Noto Serif CJK HK', 'PMingLiU';
+  --font-ui: var(--font-cjk-sans), system-ui, sans-serif;
+  --font-serif: var(--font-cjk-serif), serif;
 
   /* Type scale: multiples of the user's base size (FRONTEND.md §2.2). */
   --text-sm: 0.85rem;
@@ -42,9 +47,26 @@
 
   --radius-input: 10px;
   --radius-card: 14px;
-  --touch: 2.75rem; /* 44 px at 16 px */
-  --touch-primary: 3.25rem; /* 52 px at 16 px */
+  /* Sized for the default 18 px text, where they meet FRONTEND.md §2.3 (44 px; 52 px for primary actions). */
+  --touch: 2.5rem; /* 45 px at 18 px */
+  --touch-primary: 2.9rem; /* 52 px at 18 px */
+  /* Secondary tools (formatting, translate, stepping), kept low so the writing stays in front. */
+  --touch-compact: 2.25rem; /* 40 px at 18 px */
   --content-width: 40rem;
+}
+
+/*
+ * English: Latin system fonts first. A Chinese font's Latin set draws curly quotes and apostrophes full-width
+ * (right in Chinese, odd in "couldn’t"); Chinese characters still fall through to the Chinese fonts.
+ * Diary text follows the interface language, since an entry's own language isn't known.
+ */
+:root:lang(en) {
+  --font-ui:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', 'Helvetica Neue', Arial,
+    'Liberation Sans', 'DejaVu Sans', var(--font-cjk-sans), sans-serif;
+  --font-serif:
+    Georgia, 'Times New Roman', 'Noto Serif', 'Liberation Serif', 'DejaVu Serif',
+    var(--font-cjk-serif), serif;
 }
 
 @media (prefers-color-scheme: dark) {

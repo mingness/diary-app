@@ -135,6 +135,45 @@ describe('loadConfig', () => {
     });
   });
 
+  describe('translation (optional)', () => {
+    const translate = {
+      TRANSLATE_API_URL: 'https://api.example.com/v1',
+      TRANSLATE_API_KEY: 'not-a-real-key',
+      TRANSLATE_MODEL: 'some-model',
+    };
+
+    it('is off when unset or empty, and on with all three settings', () => {
+      expect(loadConfig(validEnv()).translate).toBeNull();
+      expect(
+        loadConfig(validEnv({ TRANSLATE_API_URL: '', TRANSLATE_API_KEY: '', TRANSLATE_MODEL: '' }))
+          .translate,
+      ).toBeNull();
+      expect(loadConfig(validEnv(translate)).translate).toEqual({
+        url: 'https://api.example.com/v1',
+        apiKey: 'not-a-real-key',
+        model: 'some-model',
+      });
+    });
+
+    it('names whichever of the three is missing', () => {
+      expect(
+        configErrorFor(validEnv({ ...translate, TRANSLATE_MODEL: undefined })).invalidVariables,
+      ).toEqual(['TRANSLATE_MODEL']);
+      expect(
+        configErrorFor(validEnv({ TRANSLATE_API_KEY: 'not-a-real-key' })).invalidVariables,
+      ).toEqual(['TRANSLATE_API_URL', 'TRANSLATE_MODEL']);
+    });
+
+    it('in production, refuses plain http and a placeholder key', () => {
+      const prod = (o: Record<string, string>) =>
+        configErrorFor(validEnv({ NODE_ENV: 'production', ...translate, ...o })).invalidVariables;
+      expect(prod({ TRANSLATE_API_URL: 'http://api.example.com/v1' })).toEqual([
+        'TRANSLATE_API_URL',
+      ]);
+      expect(prod({ TRANSLATE_API_KEY: 'change-me' })).toEqual(['TRANSLATE_API_KEY']);
+    });
+  });
+
   describe('CAPTCHA_FIXED', () => {
     it('is off unless asked for', () => {
       expect(loadConfig(validEnv()).captchaFixed).toBe(false);

@@ -6,6 +6,7 @@ import type { Config } from './config.js';
 import type { Db } from './db/client.js';
 import { generateQuestion, type CaptchaQuestion } from './domain/auth/captcha.js';
 import { createSmtpMailer, type Mailer } from './services/mailer.js';
+import { createOpenAiTranslator, type Translator } from './services/translator.js';
 
 /** The question every CAPTCHA asks when CAPTCHA_FIXED is on (development and tests only). */
 export const FIXED_CAPTCHA: CaptchaQuestion = { a: 1, op: '+', b: 2, answer: 3 };
@@ -18,12 +19,14 @@ export interface AppContext {
   readonly captchaQuestion: () => CaptchaQuestion;
   /** Sends admin alert emails; null when SMTP isn't configured (alerts then stay in the app). */
   readonly mailer: Mailer | null;
+  /** Translates diary text (spec §8); null when no provider is configured. */
+  readonly translator: Translator | null;
 }
 
 export function createContext(
   config: Config,
   db: Db,
-  overrides: Partial<Pick<AppContext, 'clock' | 'captchaQuestion' | 'mailer'>> = {},
+  overrides: Partial<Pick<AppContext, 'clock' | 'captchaQuestion' | 'mailer' | 'translator'>> = {},
 ): AppContext {
   return {
     config,
@@ -37,6 +40,12 @@ export function createContext(
         ? overrides.mailer
         : config.smtp
           ? createSmtpMailer(config.smtp)
+          : null,
+    translator:
+      overrides.translator !== undefined
+        ? overrides.translator
+        : config.translate
+          ? createOpenAiTranslator(config.translate)
           : null,
   };
 }

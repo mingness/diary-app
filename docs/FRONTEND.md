@@ -133,7 +133,8 @@ Each screen lists what it needs from the API. The API column feeds the ARCHITECT
 
 - **Read-only:** title, a meta row of values only (date, author for non-owners, access chip, comment count),
   then the body.
-- **Translation:** 翻譯 and Translate buttons, with the result shown as plain text below them.
+- **Translation:** 翻譯 and Translate buttons, with the result shown as plain text below them. When the server
+  has no translation provider (`GET /api/me` → `features.translation: false`), the buttons are greyed out.
 - **Comments:** the `Comment:` label, then one card per submitted comment (leader name, date, text, its own
   translate buttons).
 - **Owner actions:** 編輯 (opens 4.3), and the share request toggle.
@@ -150,8 +151,9 @@ Each screen lists what it needs from the API. The API column feeds the ARCHITECT
   progress bar; under that, the goal (10,000,000) and the percentage completed side by side, in large type. Below it, a slim "reported today"
   row (sum + number of entries). There is no separate goal tile (agreed).
 - **Input card:** 今日報數 with a numeric keypad, a date choice (今天 by default, or one of the previous 5 days,
-  shown as short weekday chips), 提交, and the 自動報數 checkbox with "每天北京時間凌晨 2:00". After 10 entries for
-  the chosen date, 提交 is disabled with the reason.
+  shown as short weekday chips), 提交, and the 自動報數 checkbox with "每天北京時間凌晨 2:00". After 20 reports for
+  the chosen date, 提交 is disabled with the reason. Reporting again for a date replaces that day's number
+  (say so next to 提交 when the chosen date already has one).
   Trimming and clamping happen as the user types, with the notice in a live region.
 - **Latest 20:** on phones this is a list, not a 5-column table. Each row shows name and today's count, then a
   muted line "總計 · 首次 · 最近". Rows alternate colours and auto-submit names are blue (spec §7.1). On desktop

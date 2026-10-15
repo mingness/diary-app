@@ -56,6 +56,30 @@ export interface InspectedBody {
   readonly bodyBytes: number;
 }
 
+/** Removes all markup and decodes the entities sanitize-html writes, leaving the text. */
+function textOf(html: string): string {
+  return sanitizeHtml(html, TEXT_ONLY).replace(
+    /&(amp|lt|gt|quot|#39|nbsp);/g,
+    (e) => ENTITIES[e] ?? e,
+  );
+}
+
+/**
+ * The text of a sanitised body, with one line per paragraph, heading or line break, and nothing else: no
+ * markup, no images. This is all that is sent for translation (spec §8).
+ */
+export function toPlainText(html: string): string {
+  const marked = sanitizeBody(html)
+    .replace(/<br\s*\/?>/g, '\n')
+    .replace(/<\/(p|h1|h2|h3)>/g, '\n');
+  return textOf(marked)
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line, i, lines) => line !== '' || (i > 0 && lines[i - 1] !== ''))
+    .join('\n')
+    .trim();
+}
+
 export function sanitizeBody(html: string): string {
   return sanitizeHtml(html, OPTIONS);
 }
@@ -74,13 +98,9 @@ export function inspectBody(raw: string): InspectedBody {
       return false;
     },
   });
-  const text = sanitizeHtml(html, TEXT_ONLY).replace(
-    /&(amp|lt|gt|quot|#39|nbsp);/g,
-    (e) => ENTITIES[e] ?? e,
-  );
   return {
     html,
-    visibleChars: visibleCharCount(text),
+    visibleChars: visibleCharCount(textOf(html)),
     imageBytes,
     bodyBytes: Buffer.byteLength(html, 'utf8'),
   };

@@ -400,8 +400,11 @@ traditional characters throughout (F5); no offline writing in v1 (F6).
 - `normaliseDailyCount` in `shared/src/count.ts` trims non-digits and clamps to 1–1080, returning notices. The same function runs in
   the client (UX) and the server (enforcement), and DB CHECKs are the backstop.
 - **Count date (D23):** today or up to 5 days earlier (Asia/Shanghai), from `countDateChoices` in
-  `shared/src/count.ts` (the summary returns the allowed dates for the chips); never in the future. Manual entries are limited to 10 per user per `count_date` (the auto entry is exempt), so backdating
-  can't multiply the limit. Auto-submit always uses today. "Today's count" and "first count date" use
+  `shared/src/count.ts` (the summary returns the allowed dates for the chips); never in the future. Manual entries are limited to 20 per user per `count_date` (the auto entry is exempt), so backdating
+  can't multiply the limit; the 5th warns (`COUNT_WARNING`).
+- **A report replaces the day's number:** every total uses each user's latest report per `count_date`
+  (`DISTINCT ON … ORDER BY seq DESC`; `seq` is an identity column, because two reports can share a timestamp).
+  All rows are kept as traffic. The auto job skips users who already reported for today. Auto-submit always uses today. "Today's count" and "first count date" use
   `count_date`.
 - SYS_ADMINs can delete a user's count entries by `count_date` range, so cleaning up after a hijacked account
   keeps the user's honest history.
@@ -416,6 +419,19 @@ traditional characters throughout (F5); no offline writing in v1 (F6).
 The server calls an OpenAI-compatible API (base URL, key and model from env) with a 10-second timeout, which
 returns 504 and a toast. It's rate-limited per user and faked in tests. PRIVACY.md must say that translating
 sends that text to a third-party provider.
+
+- **Optional:** `TRANSLATE_API_URL`, `TRANSLATE_API_KEY` and `TRANSLATE_MODEL`, all three or none (https only in
+  production). Without them `POST /api/translate` answers 503 `translation_unavailable`, and `GET /api/me`
+  reports `features.translation: false` so the app greys out the buttons. `ctx.translator` is
+  the seam, like `ctx.mailer`; it uses Node's `fetch`, so no new dependency.
+- **What is sent:** the text the caller may read, as `toPlainText` of the sanitised body (no markup, no images):
+  the owner's newest version (their draft if pending), otherwise the last submitted one; a submitted comment,
+  or a leader's own draft comment. Translating is not reading: no read audit, nothing marked seen.
+- **Failures:** 504 `translation_timeout`, 502 `translation_failed`; the text and the provider's error body are
+  never logged. Capped at 60 translations per user per hour (429) and 10,000 characters (413), in
+  `TRANSLATE_LIMITS`; reaching the cap doesn't flag the account (it's cost control, not a misuse signal).
+- The prompt asks for Traditional Chinese, keeps Buddhist terms and paragraph breaks, and treats the text as
+  text, never as instructions.
 
 ### 8.7 Installable web app (primary mobile path)
 
@@ -552,7 +568,8 @@ its entries in the API explorer (D20), so it can be checked by hand before any s
    scheduler, job runs. *(Done. One auto entry per user per date, enforced by a unique index, so running the
    job again the same day changes nothing. Only manual entries are `count_entry` activity. Reaching the
    per-date cap flags the account like the daily caps.)*
-10. **Translation API** (faked in tests).
+10. **Translation API** (faked in tests). *(Done. The app's error handler now passes deliberate `HttpError`s
+    through at 5xx too, so 502/503/504 keep their codes; only unexpected errors become `internal_error`.)*
 
 ### Phase B: frontend, iteratively, against seeded data
 
@@ -596,7 +613,7 @@ Each slice ships with tests, both languages where it has UI, permission tests pe
 | D18 | A leader account is deleted | **Agreed**: submitted comments stay, labelled "former leader"; drafts are deleted |
 | D19 | Can a COURSE_LEADER keep a diary? | **Agreed: yes**. Other leaders read and comment on it. Changed 2026-10-15: a leader may also comment on and approve sharing for their own entry, so the leader rules have no own-entry exception |
 | D20 | API explorer for checking the backend by hand | **Agreed**: `@fastify/swagger` + `@fastify/swagger-ui` + `fastify-type-provider-zod` (OpenAPI from the zod schemas; assets bundled, no CDN). On by default outside production, off in production; staging sets `API_DOCS=true` |
-| D21 | Usage limits against a hijacked account | **Agreed**: per user per day 20 creates, 20 first submissions, 50 updates; per entry 2 photos and 5,000 characters (framed as care for the reading leader); 10 manual count entries per count date. §8.3, §8.5 |
+| D21 | Usage limits against a hijacked account | **Agreed**: per user per day 20 creates, 20 first submissions, 50 updates; per entry 2 photos and 5,000 characters (framed as care for the reading leader); 20 manual count reports per count date (a report replaces that date's number, so this only limits traffic; changed 2026-10-15). §8.3, §8.5 |
 | D22 | Entry dates and the submit button | **Agreed**: date = creation date, set by the server; several entries per date; no backdating. 提交 for the first submit, then 更新 |
 | D23 | Backdating counts | **Agreed**: up to 5 days back; the count limit applies per count date |
 | D24 | Deleting entries | **Agreed**: SYS_ADMIN only, immediate. No user delete or trash until asked for |
@@ -604,5 +621,5 @@ Each slice ships with tests, both languages where it has UI, permission tests pe
 | D26 | Spotting odd behaviour | **Agreed**: metadata-only activity log (90 days), Attention list with simple rules, sign-out-all, lock, delete counts by date range. §8.9 |
 | D27 | Alerting SYS_ADMINs | **Agreed**: in-app Attention list always; email via SMTP (`nodemailer`, approved) from a QQ/163 mailbox when `SMTP_URL` is set. Web Push rejected: Android push is blocked in mainland China |
 | D28 | Warning levels separate from caps | **Agreed**: limits exist to spot misuse, keep leaders' reading load manageable and keep entries lean. Caps refuse; warning levels (about half the caps, plus 40 submitted comments a day) only flag the account, once a day. Per-entry refusals no longer flag. Comments have the entry's per-entry limits. §8.3, §8.9 |
-| Q1 | SYS_ADMIN resetting their own authenticator (spec §4.4 "set up / reset") | **Deferred** (2026-10-15). Today another SYS_ADMIN or the CLI resets it |
+| Q1 | SYS_ADMIN resetting their own authenticator (spec §4.4 "set up / reset") | **Deferred** (2026-10-15): another SYS_ADMIN or the CLI resets it. Revisit once the frontend is built |
 | F1–F6 | Frontend decisions | **Agreed**: see FRONTEND.md §11 |

@@ -1,6 +1,7 @@
 /**
- * Errors a handler throws to send a 4xx response. The app's error handler turns them into
- * `{code, message, requestId}` (engineering standards §12.7); `code` is what the web app translates.
+ * Errors a handler throws on purpose: mostly 4xx, plus the few 5xx the client should understand (e.g. 504 when
+ * translation times out). The app's error handler turns them into `{code, message, requestId}` (engineering
+ * standards §12.7); `code` is what the web app translates.
  */
 import { ErrorCode } from '@diary/shared';
 

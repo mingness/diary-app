@@ -23,6 +23,12 @@ export const DAILY_WARNINGS = {
 export type DailyWarningKind = keyof typeof DAILY_WARNINGS;
 
 /**
+ * 報數 reports per user for one count date (cap: 20). Once or twice is normal (a correction); this many is odd.
+ * Warns once per count date.
+ */
+export const COUNT_WARNING = { manualPerCountDate: 5 } as const;
+
+/**
  * Failed sign-ins for one existing username within an hour. The per-username lockout already stops guessing
  * after 5 in 15 minutes; this many in an hour means someone keeps coming back.
  */

@@ -34,6 +34,15 @@ export interface Config {
    * A secret (it holds the mailbox's authorization code). Without it, alerts stay in the app only.
    */
   readonly smtp: { readonly url: string; readonly from: string } | null;
+  /**
+   * Optional OpenAI-compatible chat API for translation (spec §8). The key is a secret. Without it, the
+   * translate buttons answer "unavailable".
+   */
+  readonly translate: {
+    readonly url: string;
+    readonly apiKey: string;
+    readonly model: string;
+  } | null;
 }
 
 export class ConfigError extends Error {
@@ -56,7 +65,13 @@ function looksLikeDummy(value: string): boolean {
   });
 }
 
-const SECRET_VARS = ['DIARY_KEYRING', 'PROFILE_KEYRING', 'SESSION_SECRET', 'CRON_SECRET'] as const;
+const SECRET_VARS = [
+  'DIARY_KEYRING',
+  'PROFILE_KEYRING',
+  'SESSION_SECRET',
+  'CRON_SECRET',
+  'TRANSLATE_API_KEY',
+] as const;
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -80,6 +95,18 @@ const envSchema = z.object({
     .email()
     .optional()
     .or(z.literal('').transform(() => undefined)),
+  TRANSLATE_API_URL: z
+    .url({ protocol: /^https?$/ })
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  TRANSLATE_API_KEY: z
+    .string()
+    .optional()
+    .transform((v) => v || undefined),
+  TRANSLATE_MODEL: z
+    .string()
+    .optional()
+    .transform((v) => v || undefined),
 });
 
 const defaultMigrationsDir = new URL('../../db/migrations', import.meta.url).pathname;
@@ -115,6 +142,20 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
   // Email needs both a server and a sender address, or neither.
   if (env.SMTP_URL && !env.MAIL_FROM) invalid.add('MAIL_FROM');
 
+  // Translation needs all three settings, or none.
+  const translateVars = ['TRANSLATE_API_URL', 'TRANSLATE_API_KEY', 'TRANSLATE_MODEL'] as const;
+  if (translateVars.some((name) => env[name])) {
+    for (const name of translateVars) if (!env[name]) invalid.add(name);
+  }
+  // Diary text crosses the internet to the provider: never in the clear in production.
+  if (
+    env.NODE_ENV === 'production' &&
+    env.TRANSLATE_API_URL &&
+    !env.TRANSLATE_API_URL.startsWith('https://')
+  ) {
+    invalid.add('TRANSLATE_API_URL');
+  }
+
   if (!parsed.success || invalid.size > 0 || !diaryKeyring || !profileKeyring) {
     throw new ConfigError([...invalid].sort());
   }
@@ -134,5 +175,9 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
     apiDocs: e.API_DOCS === undefined ? e.NODE_ENV !== 'production' : e.API_DOCS === 'true',
     captchaFixed: e.CAPTCHA_FIXED === 'true',
     smtp: e.SMTP_URL && e.MAIL_FROM ? { url: e.SMTP_URL, from: e.MAIL_FROM } : null,
+    translate:
+      e.TRANSLATE_API_URL && e.TRANSLATE_API_KEY && e.TRANSLATE_MODEL
+        ? { url: e.TRANSLATE_API_URL, apiKey: e.TRANSLATE_API_KEY, model: e.TRANSLATE_MODEL }
+        : null,
   };
 }

@@ -62,8 +62,8 @@ export function countRoutes(app: FastifyInstance, ctx: AppContext): void {
       schema: {
         tags: TAG,
         summary:
-          '報數: report a count (1–1080) for today or one of the 5 days before (Beijing). It also becomes my ' +
-          'saved number for auto-submit. At most 10 per count date.',
+          '報數: report my number (1–1080) for today or one of the 5 days before (Beijing). It replaces my ' +
+          'earlier number for that date and becomes my saved number for auto-submit. At most 20 per date.',
         body: SubmitCountRequest,
         response: { 201: CountEntry },
       },
@@ -71,8 +71,16 @@ export function countRoutes(app: FastifyInstance, ctx: AppContext): void {
     async (request, reply) => {
       const { user } = authOf(request);
       try {
-        const entry = await submitCount(ctx, user.id, request.body);
+        const { entry, elevated } = await submitCount(ctx, user.id, request.body);
         await safely(request.log, () => recordActivity(ctx, user, 'count_entry'));
+        if (elevated) {
+          await safely(request.log, () =>
+            recordActivity(ctx, user, 'elevated_activity', {
+              usage: elevated.usage,
+              count: elevated.count,
+            }),
+          );
+        }
         return reply.code(201).send(entry);
       } catch (err) {
         if (err instanceof LimitReachedError) {

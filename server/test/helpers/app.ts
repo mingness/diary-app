@@ -11,6 +11,7 @@ import { createContext, type AppContext } from '../../src/context.js';
 import { runMigrations } from '../../src/db/migrate.js';
 import type { AuthLimits } from '../../src/routes/auth.js';
 import type { FakeMailer } from '../../src/services/mailer.js';
+import type { FakeTranslator } from '../../src/services/translator.js';
 import { createTestDatabase, type TestDatabase } from './database.js';
 
 export const CAPTCHA_ANSWER = '3';
@@ -67,6 +68,8 @@ export async function createTestApp(
     env?: Record<string, string>;
     /** Pass a FakeMailer to switch email alerts on; by default email is not configured. */
     mailer?: FakeMailer;
+    /** Pass a FakeTranslator to switch translation on; by default it is not configured. */
+    translator?: FakeTranslator;
   } = {},
 ): Promise<TestApp> {
   const testDb = await createTestDatabase();
@@ -79,7 +82,12 @@ export async function createTestApp(
     config,
     database: testDb.database,
     logStream: { write: (line: string) => void logs.push(line) },
-    overrides: { clock: clock.now, captchaQuestion, mailer: options.mailer ?? null },
+    overrides: {
+      clock: clock.now,
+      captchaQuestion,
+      mailer: options.mailer ?? null,
+      translator: options.translator ?? null,
+    },
     authLimits: { ...GENEROUS, ...options.authLimits },
   });
   await app.ready();
@@ -87,6 +95,7 @@ export async function createTestApp(
     clock: clock.now,
     captchaQuestion,
     mailer: options.mailer ?? null,
+    translator: options.translator ?? null,
   });
   return {
     app,

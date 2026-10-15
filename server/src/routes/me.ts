@@ -48,6 +48,7 @@ export function meRoutes(app: FastifyInstance, ctx: AppContext, throttles: AuthT
         totpEnabled: user.totpEnabledAt !== null,
         storageBytes: await storageBytesFor(ctx, user.id),
       },
+      features: { translation: ctx.translator !== null },
       csrfToken: session.csrfToken,
     };
   }

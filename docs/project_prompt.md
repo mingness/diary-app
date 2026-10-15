@@ -159,6 +159,7 @@ The daily caps are set high enough that an honest user, even one catching up on 
 | First submissions (提交) | 10 per user per day | 20 |
 | Updates (更新) | 25 per user per day | 50 |
 | Comments submitted or resubmitted (drafts don't count) | 40 per leader per day | none |
+| 報數 reports for one count date (§7.2) | 5 per user | 20 |
 | Failed sign-ins for one username | 10 within an hour | sign-in blocked after 5 in 15 minutes |
 | New devices for one account | 3 within 24 hours | none |
 
@@ -217,18 +218,20 @@ REPORTED_TODAY今日報告: <today> (entries紀錄: <n>)
 ```
 - The total is the most prominent figure, with the goal and percentage in large type below the bar; there is no separate goal tile.
 - 报数 is app-wide: one shared total for all users.
+- **A report is the user's number for its count date, not an addition.** Reporting again for the same date replaces the earlier number (e.g. to correct a typo); every figure uses each user's latest report per count date. All reports are kept, for SYS_ADMINs to see the traffic.
+- Total = the sum of every user's number for every count date. "Reported today" = the sum of today's numbers, and how many people have reported for today.
 - Progress = all-time total ÷ 10,000,000 × 100%. "Today" is the current date in Beijing time. Table columns: Username (family+given name if known), Today's Count, Total, First Count Date, Latest Submit Time. Adjacent rows alternate light / sky-blue; auto-submit users shown in blue; table auto-refreshes (≈ every minute / on submit).
 
 ### 7.2 Input rules
 - Daily count: digits only, invalid characters trimmed with a notice, value clamped to **1–1080** with a notice. The server enforces the same rules.
-- Manual submit → new entry + refresh all figures and the table; the value also becomes the user's saved default for auto-submit.
+- Manual submit → the user's number for that date (replacing any earlier one) + refresh all figures and the table; the value also becomes the user's saved default for auto-submit.
 - **Count date:** defaults to today; the user may pick any of the previous 5 days (Beijing time) to report a missed day. Never a future date.
-- **Limit:** at most **10 manual entries per user per count date** (the auto-submitted entry does not count toward it). The limit is per count date, not per submit day, so backdating cannot multiply it. Reaching it is recorded as an activity event (§6.5).
+- **Limit:** at most **20 manual reports per user per count date** (the auto-submitted entry does not count toward it). Since a report replaces the day's number, repeats can't inflate the total; the cap only limits traffic. It is per count date, not per submit day, so backdating cannot multiply it. Reaching it flags the account (§6.5); so does the 5th report for one date (a warning level, §5.5), without refusing anything.
 - "Today's Count" and "First Count Date" use the count date; "Latest Submit Time" uses the submit time.
 - Auto-submit checkbox persists immediately (reverts on failure). The typed value is saved continuously (debounced) so the nightly job always uses the latest number.
 
 ### 7.3 Auto-submit job
-- **Every day at 02:00 Beijing time** the server automatically submits one entry for every user whose auto-submit is on and whose saved count is positive, using the current time as submit time and today as count date.
+- **Every day at 02:00 Beijing time** the server automatically submits one entry for every user whose auto-submit is on, whose saved count is positive, and who hasn't reported for today yet, using the current time as submit time and today as count date. It never replaces a number the user entered; a manual report later that day replaces the automatic one.
 - An in-process scheduler fires at that time; a protected internal endpoint (Bearer secret, mounted outside normal authentication, not reachable from the public internet) can trigger the same job for an external cron. A SYS_ADMIN can also trigger it manually. Each run is recorded, and a missed or failed run is visible to SYS_ADMINs.
 
 ### 7.4 Diary ↔ count navigation
@@ -241,7 +244,7 @@ REPORTED_TODAY今日報告: <today> (entries紀錄: <n>)
   - **翻译**: translate the text from English to 繁體中文 (expert level)
   - **Translate**: translate from 繁體中文 to English (expert level)
 - The result is displayed as **plain text below the buttons — never inside a text box**; a new click replaces it; buttons disable while translating.
-- Powered by an OpenAI-compatible chat API (base URL, key, model kept in server-side config/env — **never hardcoded or committed**). Server translates, times out gracefully (504 on timeout), requires login, and only translates text the requesting user is allowed to read. The privacy notice states that translated text is sent to an external provider.
+- Powered by an OpenAI-compatible chat API (base URL, key, model kept in server-side config/env — **never hardcoded or committed**). Optional: without it, the buttons say translation is unavailable. Capped at 60 translations per user per hour, for cost. Server translates, times out gracefully (504 on timeout), requires login, and only translates text the requesting user is allowed to read. The privacy notice states that translated text is sent to an external provider.
 
 ## 9. Installing on Phones
 
@@ -289,7 +292,7 @@ Build this only if testing on the users' actual phones shows the installable web
 - [ ] SYS_ADMIN: can search/add/edit/delete users and change roles, reset passwords, query/delete documents — but receives no plaintext content or comments from any endpoint; the last SYS_ADMIN cannot be removed.
 - [ ] COURSE_LEADER: sees today's submitted documents immediately after login; calendar/user navigation reaches the comment editor; can approve open requests.
 - [ ] Password change and admin reset both keep the user's old documents readable by the user.
-- [ ] 报数: clamped 1–1080 input (client and server); count date today or up to 5 days back; at most 10 manual entries per count date; manual submit updates everything; auto-submit toggle persists; admin list shows all users with toggle + delete-entries (all or by date range) + last-run status; auto job runs at 02:00 Beijing.
+- [ ] 报数: clamped 1–1080 input (client and server); count date today or up to 5 days back; a later report replaces that date's number; at most 20 manual reports per count date; manual submit updates everything; auto-submit toggle persists; admin list shows all users with toggle + delete-entries (all or by date range) + last-run status; auto job runs at 02:00 Beijing.
 - [ ] Attention: reaching a limit, failed-login bursts and new-device bursts flag the account in the SYS_ADMIN Attention list; with email configured, SYS_ADMINs also get a throttled email; activity views and emails contain no content; sign-out-all and lock work.
 - [ ] Installable: the app can be added to the home screen on Android and iPhone, opens standalone, stays logged in, picks up new versions, and never caches diary content.
 - [ ] Seed data (test environments only): 2 SYS_ADMINs, 2 COURSE_LEADERs, several NORMAL_USERs with encrypted sample diaries (including one Open, two Wait for open, one never-submitted draft, one submitted diary with a later unsubmitted draft, and comments in draft and submitted state from different leaders).

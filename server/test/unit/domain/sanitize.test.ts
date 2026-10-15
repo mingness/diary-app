@@ -3,7 +3,7 @@
  * real attack shapes, not just happy paths.
  */
 import { describe, expect, it } from 'vitest';
-import { inspectBody, sanitizeBody } from '../../../src/domain/diary/sanitize.js';
+import { inspectBody, sanitizeBody, toPlainText } from '../../../src/domain/diary/sanitize.js';
 
 const png = (bytes: number) => {
   // Valid base64 of exactly `bytes` decoded bytes.
@@ -82,5 +82,23 @@ describe('inspectBody measures what the limits need', () => {
   it('measures the sanitised HTML, not the raw input', () => {
     const raw = `<p>x</p><script>${'a'.repeat(10_000)}</script>`;
     expect(inspectBody(raw).bodyBytes).toBe(Buffer.byteLength('<p>x</p>'));
+  });
+});
+
+describe('toPlainText: what is sent for translation', () => {
+  it.each([
+    ['<p>第一段</p><p>第二段</p>', '第一段\n第二段'],
+    ['<h2>標題</h2><p>a<br>b</p>', '標題\na\nb'],
+    ['<p><b>粗體</b>與<span style="font-size: 20px">大字</span></p>', '粗體與大字'],
+    ['<p>Tom &amp; Jerry &lt;3 &quot;hi&quot;</p>', 'Tom & Jerry <3 "hi"'],
+    // A blank paragraph between two keeps one empty line; runs of them collapse.
+    ['<p>a</p><p></p><p></p><p>b</p>', 'a\n\nb'],
+  ])('%s → %j', (html, text) => {
+    expect(toPlainText(html)).toBe(text);
+  });
+
+  it('never sends images, and drops anything the sanitiser would', () => {
+    const img = `<img src="data:image/png;base64,${'A'.repeat(400)}">`;
+    expect(toPlainText(`<p>看${img}圖</p><script>x()</script>`)).toBe('看圖');
   });
 });

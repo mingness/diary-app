@@ -95,6 +95,8 @@ export const MeResponse = z.object({
     /** Total size of the user's stored data (spec §4.4: shown for information; no quota). */
     storageBytes: z.number().int(),
   }),
+  /** What this server has switched on, so the app can grey out what isn't (e.g. the translate buttons). */
+  features: z.object({ translation: z.boolean() }),
   csrfToken: z.string(),
 });
 export type MeResponse = z.infer<typeof MeResponse>;

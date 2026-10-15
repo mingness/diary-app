@@ -7,6 +7,7 @@
  */
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   boolean,
   check,
   date,
@@ -358,10 +359,15 @@ export const countEntries = pgTable(
     submittedAt: timestamptz('submitted_at').notNull(),
     /** Made by the 02:00 job rather than the user. */
     auto: boolean('auto').notNull(),
+    /**
+     * Insertion order. A report replaces the user's earlier ones for the same count date, and two reports can
+     * share a timestamp, so "latest" is decided by this, not by `submitted_at`.
+     */
+    seq: bigint('seq', { mode: 'number' }).generatedAlwaysAsIdentity().notNull(),
   },
   (t) => [
     check('count_entries_daily_count_range', sql`${t.dailyCount} BETWEEN 1 AND 1080`),
-    index('count_entries_user_date_idx').on(t.userId, t.countDate),
+    index('count_entries_user_date_idx').on(t.userId, t.countDate, t.seq),
     index('count_entries_date_idx').on(t.countDate),
     // At most one auto entry per user per date, so running the job twice in a day changes nothing.
     uniqueIndex('count_entries_one_auto_key')

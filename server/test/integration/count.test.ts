@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import {
   AdminCountUsers,
   COUNT_LIMITS,
+  COUNT_WARNING,
   CountJobRuns,
   CountLatest,
   CountSummary,
@@ -106,8 +107,28 @@ describe('reporting a count (spec §7.2)', () => {
     expect(code(refused)).toMatchObject({ code: 'limit_reached', details: { limit: 'count' } });
     // Per count date, not per day of submitting: other dates are unaffected.
     expect((await report(u, 1, '2026-10-13')).statusCode).toBe(201);
+    // The warning level was passed on the way to the cap; both flag the account.
     const flags = await t.ctx.db.select().from(alerts).where(eq(alerts.userId, u.id));
-    expect(flags.map((f) => f.rule)).toEqual(['limit_reached']);
+    expect(flags.map((f) => f.rule).sort()).toEqual(['elevated_activity', 'limit_reached']);
+  });
+
+  it(`flags the account once at the ${COUNT_WARNING.manualPerCountDate}th report for one date, without refusing`, async () => {
+    const u = await counter();
+    const flags = () => t.ctx.db.select().from(alerts).where(eq(alerts.userId, u.id));
+    for (let i = 1; i < COUNT_WARNING.manualPerCountDate; i++) await report(u, i, '2026-10-11');
+    // Spread over dates, it's normal use.
+    await report(u, 1, '2026-10-10');
+    expect(await flags()).toEqual([]);
+    expect((await report(u, 5, '2026-10-11')).statusCode).toBe(201);
+    await report(u, 6, '2026-10-11');
+    expect((await flags()).map((f) => f.rule)).toEqual(['elevated_activity']);
+    const events = await t.ctx.db
+      .select()
+      .from(activityEvents)
+      .where(and(eq(activityEvents.userId, u.id), eq(activityEvents.kind, 'elevated_activity')));
+    expect(events.map((e) => e.detail)).toEqual([
+      { usage: 'count', count: COUNT_WARNING.manualPerCountDate },
+    ]);
   });
 
   it('counts the per-date limit atomically under simultaneous submits', async () => {
@@ -126,14 +147,17 @@ describe('reporting a count (spec §7.2)', () => {
 });
 
 describe('the progress card and latest table (spec §7.1)', () => {
-  it('adds everything to the total; today counts by count date, not submit day', async () => {
+  it('a new report replaces that date’s number; today counts by count date, not submit day', async () => {
     const u = await counter();
     const before = await summary(u);
     await report(u, 100);
     await report(u, 50, '2026-10-13');
+    // A correction for today: the 100 is replaced, not added to.
+    await report(u, 30);
     const after = await summary(u);
-    expect(after.total - before.total).toBe(150);
-    expect(after.today.sum - before.today.sum).toBe(100);
+    expect(after.total - before.total).toBe(80);
+    expect(after.today.sum - before.today.sum).toBe(30);
+    // One person reported for today, however many times.
     expect(after.today.entries - before.today.entries).toBe(1);
     expect(after.percent).toBe(Math.round((after.total / after.goal) * 10_000) / 100);
     expect(after.countDates).toEqual([
@@ -149,6 +173,7 @@ describe('the progress card and latest table (spec §7.1)', () => {
   it('one row per user, most recent first, with name, today, total, first date and auto marker', async () => {
     const [a, b] = [await counter(), await counter()];
     await report(a, 10, '2026-10-10');
+    await report(a, 99);
     await report(a, 20);
     await call(a, 'PUT', '/api/count/settings', { autoSubmit: true });
     t.clock.advance(60_000);
@@ -167,25 +192,37 @@ describe('the progress card and latest table (spec §7.1)', () => {
 });
 
 describe('auto-submit (spec §7.3)', () => {
-  it('submits the saved number once a day for users who turned it on', async () => {
-    const [on, off, nothingSaved] = [await counter(), await counter(), await counter()];
-    await report(on, 108);
-    await call(on, 'PUT', '/api/count/settings', { autoSubmit: true });
+  it('fills in today’s saved number, once, for users who turned it on and haven’t reported yet', async () => {
+    const [on, reported, off, nothingSaved] = [
+      await counter(),
+      await counter(),
+      await counter(),
+      await counter(),
+    ];
+    // The typed number is saved as the user types, so the job uses the latest one.
+    await call(on, 'PUT', '/api/count/settings', { autoSubmit: true, savedCount: 216 });
+    await report(reported, 54);
+    await call(reported, 'PUT', '/api/count/settings', { autoSubmit: true, savedCount: 999 });
     await report(off, 54);
     await call(nothingSaved, 'PUT', '/api/count/settings', { autoSubmit: true });
-    // The typed number is saved as the user types, so the job uses the latest one.
-    await call(on, 'PUT', '/api/count/settings', { savedCount: 216 });
 
     expect((await autoRun(t.ctx.config.cronSecret)).json()).toEqual({ result: 'ok' });
     expect((await autoRun(t.ctx.config.cronSecret)).json()).toEqual({ result: 'ok' });
     const autos = (await entriesOf(on.id)).filter((e) => e.auto);
     expect(autos.map((e) => [e.dailyCount, e.countDate])).toEqual([[216, TODAY]]);
+    // It never overrides a number the user entered for today.
+    expect((await entriesOf(reported.id)).map((e) => [e.dailyCount, e.auto])).toEqual([
+      [54, false],
+    ]);
     expect((await entriesOf(off.id)).filter((e) => e.auto)).toEqual([]);
     expect(await entriesOf(nothingSaved.id)).toEqual([]);
-    // The auto entry doesn't use up the manual limit for today (one manual report was made above).
-    for (let i = 1; i < COUNT_LIMITS.manualPerCountDate; i++) {
-      expect((await report(on, 1)).statusCode).toBe(201);
+
+    // A manual report after the auto one replaces it, and the auto entry doesn't use up the manual limit.
+    for (let i = 0; i < COUNT_LIMITS.manualPerCountDate; i++) {
+      expect((await report(on, 108)).statusCode).toBe(201);
     }
+    const latest = CountLatest.parse((await call(on, 'GET', '/api/count/latest')).json()).rows;
+    expect(latest.find((r) => r.userId === on.id)).toMatchObject({ todayCount: 108, total: 108 });
   });
 
   it('the internal trigger needs the right bearer secret', async () => {
@@ -229,6 +266,8 @@ describe('SYS_ADMIN 報數 tools (spec §6.5.3)', () => {
     const [d0, d1, d2] = (await summary(u)).countDates;
     await report(u, 1, d2);
     await report(u, 2, d1);
+    await report(u, 9, d0);
+    // A correction: 3 replaces 9 in the total; both reports are still counted as traffic.
     await report(u, 3, d0);
 
     expect(
@@ -242,7 +281,7 @@ describe('SYS_ADMIN 報數 tools (spec §6.5.3)', () => {
     expect(listed.users.find((r) => r.userId === u.id)).toMatchObject({
       autoSubmit: true,
       total: 6,
-      entries: 3,
+      entries: 4,
     });
     expect(listed.users.some((r) => r.userId === admin.id)).toBe(true);
 
@@ -251,7 +290,7 @@ describe('SYS_ADMIN 報數 tools (spec §6.5.3)', () => {
       'DELETE',
       `/api/admin/count/users/${u.id}/entries?from=${d1}&to=${today}`,
     );
-    expect(del.json()).toEqual({ deleted: 2 });
+    expect(del.json()).toEqual({ deleted: 3 });
     expect((await entriesOf(u.id)).map((e) => e.countDate)).toEqual([d2]);
     expect((await call(admin, 'DELETE', `/api/admin/count/users/${u.id}/entries`)).json()).toEqual({
       deleted: 1,

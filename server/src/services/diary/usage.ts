@@ -36,7 +36,8 @@ export class LimitReachedError extends HttpError {
 
 /** A daily warning level just reached (spec §5.5): the route records it, which flags the account. */
 export interface Elevated {
-  readonly usage: UsageKind;
+  /** Which counter: a daily one, or 報數 reports for one count date. */
+  readonly usage: UsageKind | 'count';
   readonly count: number;
 }
 

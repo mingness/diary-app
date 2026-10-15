@@ -32,12 +32,26 @@ export const ENTRY_LIMITS = {
   titleChars: 100,
 } as const;
 
-/** 報數 (spec §7.2, D23). */
+/**
+ * 報數 (spec §7.2, D23). A report is the number for its count date and replaces the user's earlier ones for that
+ * date, so repeats can't inflate the total; this cap only limits traffic.
+ */
 export const COUNT_LIMITS = {
-  /** Manual entries per user per count date; the nightly auto entry doesn't count toward it. */
-  manualPerCountDate: 10,
+  /** Manual reports per user per count date; the nightly auto entry doesn't count toward it. */
+  manualPerCountDate: 20,
   /** A count may be reported for today or up to this many days earlier (Beijing dates); never the future. */
   backdateDays: 5,
+} as const;
+
+/**
+ * Translation (spec §8) costs money per request, so it is capped. Not a warning sign by itself: a busy leader
+ * may translate a lot, so reaching it is refused (429) but doesn't flag the account.
+ */
+export const TRANSLATE_LIMITS = {
+  /** Translations per user per hour. */
+  perUserPerHour: 60,
+  /** Longest text sent, in characters (a draft may be longer than the 5,000 a submission allows). */
+  maxChars: 10_000,
 } as const;
 
 /** History versions kept per entry (spec §5.2). */

@@ -34,6 +34,7 @@ import { leaderRoutes } from './routes/leader.js';
 import { countRoutes } from './routes/count.js';
 import { adminCountRoutes } from './routes/admin-count.js';
 import { internalRoutes } from './routes/internal.js';
+import { translateRoutes } from './routes/translate.js';
 import { healthRoutes } from './routes/health.js';
 import { meRoutes } from './routes/me.js';
 
@@ -46,7 +47,7 @@ export interface AppDeps {
   /** Tests pass a stream to capture log lines; production logs to stdout. */
   logStream?: DestinationStream;
   /** Tests pin the time and the CAPTCHA question; production uses the real clock and random questions. */
-  overrides?: Partial<Pick<AppContext, 'clock' | 'captchaQuestion' | 'mailer'>>;
+  overrides?: Partial<Pick<AppContext, 'clock' | 'captchaQuestion' | 'mailer' | 'translator'>>;
   /** Per-IP limits on the auth endpoints; tests raise them so they can make many requests. */
   authLimits?: Partial<AuthLimits>;
 }
@@ -138,7 +139,9 @@ export async function buildApp({
         message: 'Request too large',
         requestId: request.id,
       };
-    } else if (status < 500) {
+    } else if (status < 500 || error instanceof HttpError) {
+      // HttpErrors are raised on purpose with our own codes and messages (e.g. 504 translation_timeout), so
+      // they are safe to show whatever their status; anything else at 5xx is unexpected.
       body = { code: error.code ?? 'bad_request', message: error.message, requestId: request.id };
       if (error instanceof HttpError && error.details) body.details = error.details;
     } else {
@@ -168,6 +171,7 @@ export async function buildApp({
   countRoutes(app, ctx);
   adminCountRoutes(app, ctx, database.pool);
   internalRoutes(app, ctx, database.pool);
+  translateRoutes(app, ctx);
 
   return app;
 }

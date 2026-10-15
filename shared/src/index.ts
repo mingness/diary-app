@@ -38,6 +38,12 @@ export const ErrorCode = {
   LimitReached: 'limit_reached',
   /** An embedded image is too large, or the entry body is (ARCHITECTURE §8.3). */
   TooLarge: 'too_large',
+  /** Translation isn't configured on this server (503). */
+  TranslationUnavailable: 'translation_unavailable',
+  /** The translation provider answered with an error (502). */
+  TranslationFailed: 'translation_failed',
+  /** The translation provider didn't answer within 10 seconds (504, spec §8). */
+  TranslationTimeout: 'translation_timeout',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 
@@ -78,6 +84,7 @@ export * from './limits.js';
 export * from './warning-levels.js';
 export * from './diary.js';
 export * from './leader.js';
+export * from './translate.js';
 
 /** Header that must carry the session's CSRF token on every request that changes something. */
 export const CSRF_HEADER = 'x-csrf-token';

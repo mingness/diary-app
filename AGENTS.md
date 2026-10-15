@@ -64,7 +64,8 @@ Keep this file up to date when commands, conventions or pitfalls change.
 - **Time and randomness** come from the context (`ctx.clock()`, `ctx.captchaQuestion()`), never `new Date()`
   inside services, so tests can control them.
 - **Errors:** always `{code, message, requestId}`. Codes come from `ErrorCode` in `shared/`; the web app
-  translates them. Never put stack traces or secrets in responses.
+  translates them. Never put stack traces or secrets in responses. Throw `HttpError` for anything the client
+  should understand (even a 5xx such as 504); any other error becomes a generic `internal_error`.
 - **Logging:** structured, via `request.log` / `app.log`. Never log passwords, tokens, keys, diary content,
   comments or profile fields; the redaction list in `server/src/logging.ts` is a backstop, not permission.
 - **Diary content** is only handled in `server/src/services/diary/`: bodies go through `inspectBody` (sanitise +
@@ -81,6 +82,9 @@ Keep this file up to date when commands, conventions or pitfalls change.
   only). Tests call a job's function directly, or `runJob` to check run records and locking.
 - **Email** goes through `ctx.mailer`; tests pass a `FakeMailer` to `createTestApp({ mailer })`. Without
   `SMTP_URL` there is no mailer and alerts stay in the app.
+- **Translation** goes through `ctx.translator`; tests pass a `FakeTranslator` to
+  `createTestApp({ translator })` and never call a real provider. Only plain text the caller may read is sent
+  (`services/diary/translation-source.ts`), and it is never logged.
 - **Race conditions** (e.g. the last-admin rules) are tested at the service level with simultaneous calls over
   several rounds; over HTTP the first request usually finishes first and hides the race.
 - **Config:** only through `loadConfig` in `server/src/config.ts`. Add every new variable to `.env.example`

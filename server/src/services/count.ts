@@ -1,12 +1,15 @@
 /**
- * 報數 (spec §7, docs/ARCHITECTURE.md §8.5): one app-wide total everyone adds to. Counts are not content, so
- * nothing here is encrypted; names for the latest-20 table come from profiles.
+ * 報數 (spec §7, docs/ARCHITECTURE.md §8.5): one app-wide total everyone adds to. A report is the user's number
+ * for its count date: a later report for the same date replaces the earlier ones in every total, while all
+ * reports are kept (they show traffic). Counts are not content, so nothing here is encrypted; names for the
+ * latest-20 table come from profiles.
  */
 import { randomUUID } from 'node:crypto';
 import { and, asc, desc, eq, gte, lte, sql, type SQL } from 'drizzle-orm';
 import {
   COUNT_GOAL,
   COUNT_LIMITS,
+  COUNT_WARNING,
   countDateChoices,
   ErrorCode,
   type CountSettings,
@@ -15,7 +18,7 @@ import type { AppContext } from '../context.js';
 import { countEntries, countSettings, jobRuns, users } from '../db/schema.js';
 import { beijingDate, nextDailyRunAt, AUTO_SUBMIT_HOUR_BEIJING } from '../domain/count/schedule.js';
 import { HttpError } from '../http-errors.js';
-import { LimitReachedError } from './diary/usage.js';
+import { LimitReachedError, type Elevated } from './diary/usage.js';
 import { peopleByIds } from './people.js';
 
 /** The job's name in `job_runs` and its advisory lock. */
@@ -26,11 +29,18 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const MISSED_RUN_GRACE_MS = 15 * 60 * 1000;
 
 const today = (ctx: AppContext) => beijingDate(ctx.clock());
+
+/** Each user's number per count date: their latest report for it. */
+const LATEST = sql`(
+  SELECT DISTINCT ON (user_id, count_date) user_id, count_date, daily_count
+    FROM count_entries
+   ORDER BY user_id, count_date, seq DESC)`;
 const allowedDates = (ctx: AppContext) => countDateChoices(today(ctx), COUNT_LIMITS.backdateDays);
 
 /**
- * Records a manual count for today or one of the previous 5 Beijing dates (D23), and makes it the user's saved
- * number for auto-submit (spec §7.2). At most 10 manual entries per count date; the auto entry is exempt.
+ * Records a manual count for today or one of the previous 5 Beijing dates (D23); it replaces the user's earlier
+ * number for that date, and becomes their saved number for auto-submit (spec §7.2). At most 20 manual reports
+ * per count date (the auto entry is exempt); the 5th reaches the warning level.
  */
 export async function submitCount(
   ctx: AppContext,
@@ -64,7 +74,8 @@ export async function submitCount(
           eq(countEntries.auto, false),
         ),
       );
-    if ((manual?.n ?? 0) >= COUNT_LIMITS.manualPerCountDate) throw new LimitReachedError('count');
+    const before = manual?.n ?? 0;
+    if (before >= COUNT_LIMITS.manualPerCountDate) throw new LimitReachedError('count');
     const [row] = await tx
       .insert(countEntries)
       .values({
@@ -77,71 +88,88 @@ export async function submitCount(
       })
       .returning();
     if (!row) throw new Error('insert returned no row');
+    const elevated: Elevated | null =
+      before + 1 === COUNT_WARNING.manualPerCountDate
+        ? { usage: 'count', count: before + 1 }
+        : null;
     return {
-      id: row.id,
-      count: row.dailyCount,
-      countDate: row.countDate,
-      submittedAt: row.submittedAt.toISOString(),
-      auto: row.auto,
+      entry: {
+        id: row.id,
+        count: row.dailyCount,
+        countDate: row.countDate,
+        submittedAt: row.submittedAt.toISOString(),
+        auto: row.auto,
+      },
+      elevated,
     };
   });
 }
 
-/** The progress card: the all-time total, and what has been reported for today. */
+/** The progress card: the all-time total, and what has been reported for today (one number per user). */
 export async function countSummary(ctx: AppContext) {
   const date = today(ctx);
-  const [row] = await ctx.db
-    .select({
-      // bigint arrives as a string; the total stays far below 2^53.
-      total: sql<string>`coalesce(sum(${countEntries.dailyCount}), 0)::bigint`,
-      todaySum: sql<number>`coalesce(sum(${countEntries.dailyCount}) FILTER (WHERE ${countEntries.countDate} = ${date}), 0)::int`,
-      todayEntries: sql<number>`(count(*) FILTER (WHERE ${countEntries.countDate} = ${date}))::int`,
-    })
-    .from(countEntries);
+  const { rows } = await ctx.db.execute<{
+    total: string;
+    today_sum: number;
+    today_users: number;
+  }>(sql`
+    SELECT coalesce(sum(l.daily_count), 0)::bigint AS total,
+           coalesce(sum(l.daily_count) FILTER (WHERE l.count_date = ${date}::date), 0)::int AS today_sum,
+           (count(*) FILTER (WHERE l.count_date = ${date}::date))::int AS today_users
+      FROM ${LATEST} l`);
+  const row = rows[0];
+  // bigint arrives as a string; the total stays far below 2^53.
   const total = Number(row?.total ?? 0);
   return {
     total,
     goal: COUNT_GOAL,
     percent: Math.round((total / COUNT_GOAL) * 10_000) / 100,
-    today: { date, sum: row?.todaySum ?? 0, entries: row?.todayEntries ?? 0 },
+    today: { date, sum: row?.today_sum ?? 0, entries: row?.today_users ?? 0 },
     countDates: allowedDates(ctx),
   };
 }
 
-/** The latest-20 table: one row per user, most recent submission first. */
+/** The latest-20 table: one row per user, most recent report first. */
 export async function latestCounts(ctx: AppContext) {
   const date = today(ctx);
-  const rows = await ctx.db
-    .select({
-      userId: countEntries.userId,
-      todayCount: sql<number>`coalesce(sum(${countEntries.dailyCount}) FILTER (WHERE ${countEntries.countDate} = ${date}), 0)::int`,
-      total: sql<number>`sum(${countEntries.dailyCount})::int`,
-      firstCountDate: sql<string>`min(${countEntries.countDate})::text`,
-      latestSubmitAt: sql<Date>`max(${countEntries.submittedAt})`,
-      autoSubmit: sql<boolean>`coalesce(bool_or(${countSettings.autoSubmit}), false)`,
-    })
-    .from(countEntries)
-    .leftJoin(countSettings, eq(countSettings.userId, countEntries.userId))
-    .groupBy(countEntries.userId)
-    .orderBy(desc(sql`max(${countEntries.submittedAt})`))
-    .limit(20);
+  const { rows } = await ctx.db.execute<{
+    user_id: string;
+    latest_submit_at: Date | string;
+    today_count: number;
+    total: number;
+    first_count_date: string;
+    auto_submit: boolean;
+  }>(sql`
+    WITH recent AS (
+      SELECT user_id, max(submitted_at) AS latest_submit_at
+        FROM count_entries GROUP BY user_id ORDER BY 2 DESC LIMIT 20)
+    SELECT r.user_id, r.latest_submit_at,
+           coalesce(sum(l.daily_count) FILTER (WHERE l.count_date = ${date}::date), 0)::int AS today_count,
+           sum(l.daily_count)::int AS total,
+           min(l.count_date)::text AS first_count_date,
+           coalesce(s.auto_submit, false) AS auto_submit
+      FROM recent r
+      JOIN ${LATEST} l ON l.user_id = r.user_id
+      LEFT JOIN count_settings s ON s.user_id = r.user_id
+     GROUP BY r.user_id, r.latest_submit_at, s.auto_submit
+     ORDER BY r.latest_submit_at DESC`);
   const people = await peopleByIds(
     ctx,
-    rows.map((r) => r.userId),
+    rows.map((r) => r.user_id),
   );
   return {
     rows: rows.flatMap((r) => {
-      const person = people.get(r.userId);
+      const person = people.get(r.user_id);
       if (!person) return [];
       return [
         {
-          userId: r.userId,
+          userId: r.user_id,
           name: person.name,
-          todayCount: r.todayCount,
+          todayCount: r.today_count,
           total: r.total,
-          firstCountDate: r.firstCountDate,
-          latestSubmitAt: new Date(r.latestSubmitAt).toISOString(),
-          autoSubmit: r.autoSubmit,
+          firstCountDate: r.first_count_date,
+          latestSubmitAt: new Date(r.latest_submit_at).toISOString(),
+          autoSubmit: r.auto_submit,
         },
       ];
     }),
@@ -186,8 +214,9 @@ export async function updateCountSettings(
 }
 
 /**
- * The 02:00 job (spec §7.3): one entry dated today for everyone with auto-submit on and a saved number.
- * Running it again the same day adds nothing (one auto entry per user per date).
+ * The 02:00 job (spec §7.3): today's number for everyone with auto-submit on and a saved number who hasn't
+ * reported for today yet. It never replaces a number the user entered. Running it again the same day adds
+ * nothing (and the unique index allows one auto entry per user per date).
  */
 export async function runAutoSubmit(ctx: AppContext): Promise<Record<string, number>> {
   const date = today(ctx);
@@ -197,6 +226,8 @@ export async function runAutoSubmit(ctx: AppContext): Promise<Record<string, num
     SELECT gen_random_uuid(), s.user_id, s.saved_count, ${date}::date, ${now}, true
       FROM count_settings s
      WHERE s.auto_submit AND s.saved_count > 0
+       AND NOT EXISTS (SELECT 1 FROM count_entries e
+                        WHERE e.user_id = s.user_id AND e.count_date = ${date}::date)
     ON CONFLICT (user_id, count_date) WHERE auto DO NOTHING
     RETURNING id`);
   return { submitted: result.rows.length };
@@ -210,7 +241,11 @@ export async function adminCountUsers(ctx: AppContext) {
       username: users.username,
       autoSubmit: sql<boolean>`coalesce(${countSettings.autoSubmit}, false)`,
       savedCount: sql<number>`coalesce(${countSettings.savedCount}, 0)`,
-      total: sql<number>`(SELECT coalesce(sum(e.daily_count), 0)::int FROM count_entries e WHERE e.user_id = users.id)`,
+      // Latest report per count date, as in every total.
+      total: sql<number>`(SELECT coalesce(sum(x.daily_count), 0)::int FROM (
+        SELECT DISTINCT ON (e.count_date) e.daily_count FROM count_entries e
+         WHERE e.user_id = users.id ORDER BY e.count_date, e.seq DESC) x)`,
+      /** Every report, replaced ones included: this is traffic. */
       entries: sql<number>`(SELECT count(*)::int FROM count_entries e WHERE e.user_id = users.id)`,
       latestSubmitAt: sql<Date | null>`(SELECT max(e.submitted_at) FROM count_entries e WHERE e.user_id = users.id)`,
     })

@@ -90,13 +90,16 @@ export const CountEntry = z.object({
   auto: z.boolean(),
 });
 
-/** The progress card (spec §7.1). App-wide: one shared total. */
+/**
+ * The progress card (spec §7.1). App-wide: one shared total. Every figure uses each user's latest report per
+ * count date: reporting again for a date replaces that day's number, it doesn't add to it.
+ */
 export const CountSummary = z.object({
   total: z.number().int(),
   goal: z.number().int(),
   /** total ÷ goal × 100, to two decimals. */
   percent: z.number(),
-  /** Today's Beijing date, and what has been reported for it. */
+  /** Today's Beijing date, the sum of today's numbers, and how many people have reported for today. */
   today: z.object({ date: z.iso.date(), sum: z.number().int(), entries: z.number().int() }),
   /** The dates the caller may report for, newest first (today first). */
   countDates: z.array(z.iso.date()),
@@ -137,6 +140,7 @@ export const AdminCountUsers = z.object({
       autoSubmit: z.boolean(),
       savedCount: z.number().int(),
       total: z.number().int(),
+      /** Every report, replaced ones included (traffic). */
       entries: z.number().int(),
       latestSubmitAt: z.iso.datetime().nullable(),
     }),

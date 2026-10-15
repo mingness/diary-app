@@ -1,27 +1,56 @@
 /**
- * The signed-in user (spec §4.4) and authenticator setup (D12). The rest of the account page (profile edits,
- * password change, devices) arrives in delivery slice 8.
+ * The account page (spec §4.4): the signed-in user, profile and appearance, password change, signed-in devices,
+ * and authenticator setup (D12).
  */
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { and, eq, isNull } from 'drizzle-orm';
 import QRCode from 'qrcode';
-import { ErrorCode, MeResponse, OkResponse, TotpCode, TotpSetupResponse } from '@diary/shared';
+import {
+  ChangePasswordRequest,
+  DeviceList,
+  ErrorCode,
+  MeResponse,
+  OkResponse,
+  SessionIdParams,
+  TotpCode,
+  TotpSetupResponse,
+  UpdateMeRequest,
+} from '@diary/shared';
 import type { AppContext } from '../context.js';
 import { users } from '../db/schema.js';
 import { checkTotp, generateTotpSecret, totpUri } from '../domain/auth/totp.js';
 import { HttpError } from '../http-errors.js';
-import { authOf, requireAuth } from '../plugins/auth.js';
+import { authOf, clearSessionCookie, requireAuth } from '../plugins/auth.js';
+import { changePassword, listMySessions, revokeMySession, updateMe } from '../services/account.js';
+import { recordActivity, safely } from '../services/activity.js';
 import { openProfile, openTotpSecret, sealTotpSecret } from '../services/profiles.js';
-import { setSessionMfa } from '../services/sessions.js';
+import { setSessionMfa, type SessionRow } from '../services/sessions.js';
 import { storageBytesFor } from '../services/storage.js';
-import { toSessionUser } from './auth.js';
+import type { UserRow } from '../services/users.js';
+import { toSessionUser, type AuthThrottles } from './auth.js';
 
 const ME_TAG = ['me'];
 const enrolmentAllowed = requireAuth({ allowMfa: ['enrolment_required'] });
 
-export function meRoutes(app: FastifyInstance, ctx: AppContext): void {
+export function meRoutes(app: FastifyInstance, ctx: AppContext, throttles: AuthThrottles): void {
   const routes = app.withTypeProvider<ZodTypeProvider>();
+  const signedIn = requireAuth();
+
+  /** What `GET /api/me` and `PUT /api/me` answer. Never cached: it holds the decrypted profile. */
+  async function me(reply: FastifyReply, user: UserRow, session: SessionRow) {
+    reply.header('cache-control', 'no-store');
+    return {
+      user: {
+        ...toSessionUser(user),
+        email: user.email,
+        profile: openProfile(ctx.config.profileKeyring, user.id, user),
+        totpEnabled: user.totpEnabledAt !== null,
+        storageBytes: await storageBytesFor(ctx, user.id),
+      },
+      csrfToken: session.csrfToken,
+    };
+  }
 
   routes.get(
     '/api/me',
@@ -35,17 +64,84 @@ export function meRoutes(app: FastifyInstance, ctx: AppContext): void {
     },
     async (request, reply) => {
       const { user, session } = authOf(request);
-      reply.header('cache-control', 'no-store');
-      return {
-        user: {
-          ...toSessionUser(user),
-          email: user.email,
-          profile: openProfile(ctx.config.profileKeyring, user.id, user),
-          totpEnabled: user.totpEnabledAt !== null,
-          storageBytes: await storageBytesFor(ctx, user.id),
-        },
-        csrfToken: session.csrfToken,
-      };
+      return me(reply, user, session);
+    },
+  );
+
+  routes.put(
+    '/api/me',
+    {
+      onRequest: signedIn,
+      schema: {
+        tags: ME_TAG,
+        summary:
+          'Save my email, profile (name, address, photo), text size or theme; fields left out stay as they are. ' +
+          'The username never changes.',
+        body: UpdateMeRequest,
+        response: { 200: MeResponse },
+      },
+    },
+    async (request, reply) => {
+      const { user, session } = authOf(request);
+      return me(reply, await updateMe(ctx, user, request.body), session);
+    },
+  );
+
+  routes.post(
+    '/api/me/password',
+    {
+      onRequest: signedIn,
+      schema: {
+        tags: ME_TAG,
+        summary:
+          'Change my password (current password required). Signs out my other devices; this one stays signed in.',
+        body: ChangePasswordRequest,
+        response: { 200: OkResponse },
+      },
+    },
+    async (request) => {
+      const { user, session } = authOf(request);
+      await changePassword(ctx, user, session, request.body, throttles.password);
+      request.log.info({ event: 'password_changed', userId: user.id }, 'password changed');
+      await safely(request.log, () =>
+        recordActivity(ctx, user, 'password_changed', { by: 'self' }),
+      );
+      return { ok: true as const };
+    },
+  );
+
+  routes.get(
+    '/api/me/sessions',
+    {
+      onRequest: signedIn,
+      schema: {
+        tags: ME_TAG,
+        summary: 'My signed-in devices, most recently used first',
+        response: { 200: DeviceList },
+      },
+    },
+    async (request) => {
+      const { user, session } = authOf(request);
+      return listMySessions(ctx, user, session);
+    },
+  );
+
+  routes.delete(
+    '/api/me/sessions/:id',
+    {
+      onRequest: signedIn,
+      schema: {
+        tags: ME_TAG,
+        summary: 'Sign out one of my devices (this one included)',
+        params: SessionIdParams,
+        response: { 200: OkResponse },
+      },
+    },
+    async (request, reply) => {
+      const { user, session } = authOf(request);
+      const { wasCurrent } = await revokeMySession(ctx, user, session, request.params.id);
+      if (wasCurrent) clearSessionCookie(reply, ctx);
+      return { ok: true as const };
     },
   );
 

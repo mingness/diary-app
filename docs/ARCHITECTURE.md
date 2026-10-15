@@ -339,7 +339,9 @@ for any submitted entry, their own included, and the review lists include their 
   - Signing in replaces any session the browser already had (prevents session fixation).
 - **TOTP:** required for SYS_ADMIN, enrolled on first login (or through the CLI for the first admin); optional
   for others. Recovery is another SYS_ADMIN resetting it, or the CLI for the last admin.
-  - Password changes and resets revoke all the user's sessions except the current one.
+  - Password changes and resets revoke all the user's sessions except the current one. Changing one's own
+    password needs the current one; wrong guesses share the sign-in throttle, so a stolen session can't be
+    used to guess it.
 
 ### 8.3 Diary
 
@@ -540,7 +542,9 @@ its entries in the API explorer (D20), so it can be checked by hand before any s
 7. **Open diaries API:** the month list of open entries and the reader view of an open entry. *(Done. The
    list carries no content; expanding a row reads the entry through `GET /api/documents/:id`, which checks
    access again. Readers' reads aren't audited: the audit is for leaders.)*
-8. **Account API:** profile, password change, devices, preferences.
+8. **Account API:** profile, password change, devices, preferences. *(Done. A wrong current password answers
+   `wrong_password` (403, not 401, so the app doesn't treat it as signed out) and counts toward the same
+   per-username throttle as sign-in.)*
 9. **報數 API:** summary, latest, settings, count date and per-date limit, admin list, delete by date range,
    scheduler, job runs.
 10. **Translation API** (faked in tests).

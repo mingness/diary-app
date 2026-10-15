@@ -30,6 +30,8 @@ export const ErrorCode = {
   RateLimited: 'rate_limited',
   /** The change would leave no SYS_ADMIN (deleting or demoting the last one). */
   LastAdmin: 'last_admin',
+  /** The current password given to change it was wrong. Not 401: the session itself is fine. */
+  WrongPassword: 'wrong_password',
   /** An admin action that can't be applied to one's own account (e.g. deleting it). */
   SelfAction: 'self_action',
   /** A usage limit (spec §5.5); `details` says which and, for daily limits, when it resets. */
@@ -69,6 +71,7 @@ export const REQUEST_ID_HEADER = 'x-request-id';
 export * from './roles.js';
 export * from './count.js';
 export * from './auth.js';
+export * from './account.js';
 export * from './admin.js';
 export * from './activity.js';
 export * from './limits.js';

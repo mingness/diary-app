@@ -150,16 +150,13 @@ export async function buildApp({
   await installAuth(app, ctx);
 
   healthRoutes(app, { pool: database.pool, migrationsDir: config.migrationsDir });
-  authRoutes(
-    app,
-    ctx,
-    { ...DEFAULT_AUTH_LIMITS, ...authLimits },
-    {
-      password: new FailureThrottle({ maxFailures: 5, windowMs: 15 * 60 * 1000 }, ctx.clock),
-      totp: new FailureThrottle({ maxFailures: 5, windowMs: 15 * 60 * 1000 }, ctx.clock),
-    },
-  );
-  meRoutes(app, ctx);
+  // Shared by sign-in and password change, so guesses through either count toward one limit.
+  const throttles = {
+    password: new FailureThrottle({ maxFailures: 5, windowMs: 15 * 60 * 1000 }, ctx.clock),
+    totp: new FailureThrottle({ maxFailures: 5, windowMs: 15 * 60 * 1000 }, ctx.clock),
+  };
+  authRoutes(app, ctx, { ...DEFAULT_AUTH_LIMITS, ...authLimits }, throttles);
+  meRoutes(app, ctx, throttles);
   adminUserRoutes(app, ctx);
   adminActivityRoutes(app, ctx);
   adminDocumentRoutes(app, ctx);

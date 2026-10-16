@@ -1,0 +1,59 @@
+# Production stack for a single server: docker compose up -d --build
+# Values like ${PGPASSWORD} are read from .env next to this file.
+
+services:
+  db:
+    image: docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${PGDATABASE}
+      POSTGRES_USER: ${PGUSER}
+      POSTGRES_PASSWORD: ${PGPASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PGUSER} -d ${PGDATABASE}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Exactly one replica: the daily count job runs inside this process
+  backend:
+    build:
+      context: .
+      dockerfile: Containerfile
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PGHOST: db
+      PGPORT: "5432"
+    volumes:
+      - uploads:/app/backend/uploads
+      - downloads:/app/backend/downloads
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    image: docker.io/library/caddy:2-alpine
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  uploads:
+  downloads:
+  caddy_data:
+  caddy_config:

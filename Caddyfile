@@ -1,0 +1,14 @@
+# DOMAIN comes from .env (e.g. diary.example.com). Caddy gets a Let's Encrypt
+# certificate for it automatically and redirects http:// to https://.
+# DOMAIN=localhost gives a self-signed certificate for trying it out locally.
+{$DOMAIN} {
+	encode gzip
+
+	# Backend accepts JSON bodies up to 10 MB (express.json limit)
+	request_body {
+		max_size 12MB
+	}
+
+	# The backend serves /api, /uploads and the frontend itself
+	reverse_proxy backend:3001
+}
